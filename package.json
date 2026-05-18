@@ -14,6 +14,7 @@
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "file:../../.nvm/versions/node/v22.16.0/lib/node_modules/@earendil-works/pi-coding-agent",
+    "typescript": "^6.0.3",
     "vitest": "^3.0.0"
   }
 }

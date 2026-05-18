@@ -57,6 +57,19 @@ async function hasGoFilesRecursive(
 }
 
 /**
+ * Check if gograph is installed and available in PATH.
+ */
+export async function isGographInstalled(): Promise<boolean> {
+  try {
+    const { execSync } = await import("node:child_process");
+    execSync("gograph --version", { timeout: 3000, stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Check if a gograph index exists in the project.
  */
 export async function hasIndex(cwd: string): Promise<boolean> {
