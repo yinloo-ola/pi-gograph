@@ -16,64 +16,54 @@ function showStatus(
   const { installed, hasIdx } = options;
 
   if (!installed) {
-    ctx.ui.setStatus("gograph", "📦 run /gograph-setup");
+    ctx.ui.setStatus("gograph", "📦 gograph: run /gograph-setup");
     return;
   }
 
   if (!hasIdx) {
-    ctx.ui.setStatus("gograph", "run /gograph-build to index");
+    ctx.ui.setStatus("gograph", "gograph: run /gograph-build");
     return;
   }
 
-  ctx.ui.setStatus("gograph", "ready ✓");
+  ctx.ui.setStatus("gograph", "gograph ✓");
 }
 
 export default function gographExtension(pi: ExtensionAPI) {
-  // Initialize runner with pi's exec function
   initRunner(pi.exec.bind(pi));
 
-  // Detect and register on session start
   pi.on("session_start", async (_event, ctx) => {
     try {
-      ctx.ui.notify("pi-gograph: session_start fired", "info");
-
       const goRepo = await isGoRepo(ctx.cwd);
-      if (!goRepo) return; // Extension invisible in non-Go projects
-
-      ctx.ui.notify(`pi-gograph: Go repo detected at ${ctx.cwd}`, "info");
+      if (!goRepo) return;
 
       const installed = await isGographInstalled();
       const hasIdx = installed ? await hasIndex(ctx.cwd) : false;
 
-      ctx.ui.notify(`pi-gograph: installed=${installed}, hasIdx=${hasIdx}`, "info");
+      registerTools(pi);
+      registerCommands(pi, ctx, { installed, hasIdx });
 
-    // Always register tools (execute() handles missing gograph gracefully)
-    registerTools(pi);
+      if (installed && hasIdx) {
+        pi.on("before_agent_start", async (_event, _agentCtx) => {
+          return {
+            systemPrompt:
+              "\n\n## Go Code Navigation (gograph)\n" +
+              "This Go project is indexed with gograph. Prefer gograph tools over grep/cat for structural Go queries.\n" +
+              "- `gograph_context` — get source + callers + callees + tests in ONE call (replaces 4-5 grep/cat calls)\n" +
+              "- `gograph_implementers` — find which structs implement an interface\n" +
+              "- `gograph_impact` — check blast radius before modifying a function\n" +
+              "- `gograph_source` — extract just the source of a symbol without reading the whole file\n" +
+              "- `gograph_endpoint` — full vertical slice from HTTP handler to SQL\n" +
+              "- Use `grep` ONLY for string literals, config files, or non-Go files.\n",
+          };
+        });
+      }
 
-    // Always register commands
-    registerCommands(pi, ctx, { installed, hasIdx });
-
-    // Inject system prompt only when everything is ready
-    if (installed && hasIdx) {
-      pi.on("before_agent_start", async (_event, _agentCtx) => {
-        return {
-          systemPrompt:
-            "\n\n## Go Code Navigation (gograph)\n" +
-            "This Go project is indexed with gograph. Prefer gograph tools over grep/cat for structural Go queries.\n" +
-            "- `gograph_context` — get source + callers + callees + tests in ONE call (replaces 4-5 grep/cat calls)\n" +
-            "- `gograph_implementers` — find which structs implement an interface\n" +
-            "- `gograph_impact` — check blast radius before modifying a function\n" +
-            "- `gograph_source` — extract just the source of a symbol without reading the whole file\n" +
-            "- `gograph_endpoint` — full vertical slice from HTTP handler to SQL\n" +
-            "- Use `grep` ONLY for string literals, config files, or non-Go files.\n",
-        };
-      });
-    }
-
-    // Show appropriate status
-    showStatus(ctx, { installed, hasIdx });
+      showStatus(ctx, { installed, hasIdx });
     } catch (err) {
-      ctx.ui.notify(`pi-gograph error: ${err instanceof Error ? err.message : String(err)}`, "error");
+      ctx.ui.notify(
+        `pi-gograph error: ${err instanceof Error ? err.message : String(err)}`,
+        "error",
+      );
     }
   });
 }
