@@ -39,7 +39,11 @@ cp -r pi-gograph ~/.pi/agent/extensions/
 
 ## Usage
 
-The extension activates automatically in Go projects (detected by `go.mod` or `*.go` files).
+The extension activates automatically in Go projects (detected by `go.mod` or `*.go` files). You'll see a status indicator in pi's footer:
+
+- `📦 gograph: run /gograph-setup` — gograph not installed
+- `gograph: run /gograph-build` — installed but no index
+- `gograph ✓` — ready
 
 ### First time setup
 
@@ -50,7 +54,7 @@ If gograph is not installed:
 ```
 
 This will:
-1. Install gograph (via Homebrew or `go install`)
+1. Try to install gograph via Homebrew, falling back to `go install` if brew fails
 2. Build the initial index
 
 ### Rebuild index

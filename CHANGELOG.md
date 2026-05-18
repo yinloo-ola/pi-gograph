@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.4
+
+### Fixed
+
+- `/gograph-setup` now falls back to `go install` when `brew install` fails
+
+## 0.1.3
+
+### Fixed
+
+- Status bar labels now show `gograph ✓` instead of ambiguous `ready ✓`
+- Added error handling around `session_start` handler to surface errors instead of failing silently
+
+## 0.1.1
+
+### Changed
+
+- Updated README with npm install instructions, badges, and preview image
+- Added `peerDependencies` for pi core packages
+- Added `.npmignore` to exclude tests and docs from published package
+- Added `.gitignore`, `CHANGELOG.md`, GitHub Actions CI
+
 ## 0.1.0
 
 Initial release.
