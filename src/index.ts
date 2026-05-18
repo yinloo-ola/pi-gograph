@@ -5,23 +5,17 @@ import { registerTools } from "./tools.js";
 import { registerCommands } from "./commands.js";
 import { getBackgroundStatus, scheduleBackgroundRefresh } from "./refresh.js";
 
-interface StatusOptions {
-  installed: boolean;
-  hasIdx: boolean;
-}
-
 function showStatus(
   ctx: { ui: { setStatus: (key: string, value: string | undefined) => void } },
-  options: StatusOptions,
+  installed: boolean,
+  indexed: boolean,
 ): void {
-  const { installed, hasIdx } = options;
-
   if (!installed) {
     ctx.ui.setStatus("gograph", "📦 gograph: run /gograph-setup");
     return;
   }
 
-  if (!hasIdx) {
+  if (!indexed) {
     ctx.ui.setStatus("gograph", "gograph: run /gograph-build");
     return;
   }
@@ -44,12 +38,12 @@ export default function gographExtension(pi: ExtensionAPI) {
       if (!goRepo) return;
 
       const installed = await isGographInstalled();
-      const hasIdx = installed ? await hasIndex(ctx.cwd) : false;
+      const indexed = installed ? await hasIndex(ctx.cwd) : false;
 
       registerTools(pi);
-      registerCommands(pi, ctx, { installed, hasIdx });
+      registerCommands(pi);
 
-      if (installed && hasIdx) {
+      if (installed && indexed) {
         pi.on("before_agent_start", async (_event, _agentCtx) => {
           return {
             systemPrompt:
@@ -66,7 +60,7 @@ export default function gographExtension(pi: ExtensionAPI) {
       }
 
       scheduleBackgroundRefresh(pi, ctx.cwd, ctx.ui);
-      showStatus(ctx, { installed, hasIdx });
+      showStatus(ctx, installed, indexed);
     } catch (err) {
       ctx.ui.notify(
         `pi-gograph error: ${err instanceof Error ? err.message : String(err)}`,

@@ -1,5 +1,5 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { isGographInstalled } from "./detect.js";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { hasIndex as hasGographIndex, isGographInstalled } from "./detect.js";
 import { runGograph } from "./runner.js";
 import {
   clearBackgroundStatus,
@@ -13,30 +13,24 @@ function getErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-interface CommandOptions {
-  installed: boolean;
-  hasIdx: boolean;
+async function saveIndexState(pi: ExtensionAPI, cwd: string): Promise<void> {
+  const state = await getCurrentIndexState(pi, cwd);
+  if (state) {
+    await writeIndexState(cwd, state);
+  }
 }
 
-export function registerCommands(
-  pi: ExtensionAPI,
-  ctx: ExtensionContext,
-  options: CommandOptions,
-): void {
-  registerSetupCommand(pi, ctx, options.installed);
-  registerStatusCommand(pi, ctx, options);
-  registerBuildCommand(pi, options.installed);
+export function registerCommands(pi: ExtensionAPI): void {
+  registerSetupCommand(pi);
+  registerStatusCommand(pi);
+  registerBuildCommand(pi);
 }
 
-function registerSetupCommand(
-  pi: ExtensionAPI,
-  _ctx: ExtensionContext,
-  installed: boolean,
-): void {
+function registerSetupCommand(pi: ExtensionAPI): void {
   pi.registerCommand("gograph-setup", {
     description: "Install gograph and build the initial index",
     handler: async (_args, commandCtx) => {
-      if (installed) {
+      if (await isGographInstalled()) {
         commandCtx.ui.notify(
           "gograph is already installed. Use /gograph-build to rebuild the index.",
           "info",
@@ -102,11 +96,8 @@ function registerSetupCommand(
       commandCtx.ui.notify("Building index...", "info");
 
       try {
-        const currentState = await getCurrentIndexState(pi, commandCtx.cwd);
         await runGograph(["build", "."], undefined, 60_000);
-        if (currentState) {
-          await writeIndexState(commandCtx.cwd, currentState);
-        }
+        await saveIndexState(pi, commandCtx.cwd);
 
         commandCtx.ui.notify("Index built successfully!", "info");
         commandCtx.ui.setStatus("gograph", "gograph ✓");
@@ -118,24 +109,20 @@ function registerSetupCommand(
   });
 }
 
-function registerStatusCommand(
-  pi: ExtensionAPI,
-  _ctx: ExtensionContext,
-  options: CommandOptions,
-): void {
+function registerStatusCommand(pi: ExtensionAPI): void {
   pi.registerCommand("gograph-status", {
     description: "Show gograph installation and index status",
     handler: async (_args, commandCtx) => {
       scheduleBackgroundRefresh(pi, commandCtx.cwd, commandCtx.ui);
 
-      const { installed, hasIdx } = options;
-
+      const installed = await isGographInstalled();
       if (!installed) {
         commandCtx.ui.notify("gograph: not installed", "info");
         return;
       }
 
-      if (!hasIdx) {
+      const indexed = await hasGographIndex(commandCtx.cwd);
+      if (!indexed) {
         commandCtx.ui.notify("gograph: installed, no index", "info");
         return;
       }
@@ -151,10 +138,7 @@ function registerStatusCommand(
   });
 }
 
-function registerBuildCommand(
-  pi: ExtensionAPI,
-  installed: boolean,
-): void {
+function registerBuildCommand(pi: ExtensionAPI): void {
   pi.registerCommand("gograph-build", {
     description: "Build or rebuild the gograph index",
     getArgumentCompletions: (prefix: string) => {
@@ -164,7 +148,7 @@ function registerBuildCommand(
       return null;
     },
     handler: async (args, commandCtx) => {
-      if (!installed) {
+      if (!(await isGographInstalled())) {
         commandCtx.ui.notify(
           "gograph is not installed. Run /gograph-setup first.",
           "error",
@@ -184,11 +168,8 @@ function registerBuildCommand(
       );
 
       try {
-        const currentState = await getCurrentIndexState(pi, commandCtx.cwd);
         await runGograph(cmdArgs, undefined, 60_000);
-        if (currentState) {
-          await writeIndexState(commandCtx.cwd, currentState);
-        }
+        await saveIndexState(pi, commandCtx.cwd);
 
         commandCtx.ui.notify("gograph index built successfully!", "info");
         commandCtx.ui.setStatus("gograph", "gograph ✓");
