@@ -1,5 +1,8 @@
 # pi-gograph
 
+[![npm version](https://img.shields.io/npm/v/pi-gograph.svg)](https://www.npmjs.com/package/pi-gograph)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 [Gograph](https://github.com/ozgurcd/gograph) integration for [pi](https://github.com/earendil-works/pi-mono) — AST-aware Go code navigation as native LLM tools.
 
 ## What it does
@@ -15,20 +18,19 @@ Gograph builds a compact graph of your Go project's packages, symbols, calls, ro
 ## Prerequisites
 
 - [pi](https://github.com/earendil-works/pi-mono) installed
-- [gograph](https://github.com/ozgurcd/gograph) installed (`brew install ozgurcd/tap/gograph`)
+- [gograph](https://github.com/ozgurcd/gograph) installed (the extension can auto-install it via `/gograph-setup`)
 
 ## Installation
 
-Copy this directory to `~/.pi/agent/extensions/pi-gograph/`:
-
 ```bash
-cp -r pi-gograph ~/.pi/agent/extensions/
+pi install npm:pi-gograph
 ```
 
-Or install via pi's package system (if published):
+Or install manually by copying to your extensions directory:
 
 ```bash
-pi install pi-gograph
+git clone https://github.com/yinloo-ola/pi-gograph.git
+cp -r pi-gograph ~/.pi/agent/extensions/
 ```
 
 ## Usage
@@ -88,6 +90,8 @@ Or with precise mode (type-checked, slower):
 ## Development
 
 ```bash
+git clone https://github.com/yinloo-ola/pi-gograph.git
+cd pi-gograph
 npm install
 npm test
 ```
