@@ -1,0 +1,16 @@
+{
+  "name": "pi-gograph",
+  "version": "0.1.0",
+  "description": "Gograph integration for pi — AST-aware Go code navigation",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}
