@@ -28,6 +28,8 @@ Gograph builds a compact graph of your Go project's packages, symbols, calls, ro
 pi install npm:pi-gograph
 ```
 
+> **Note:** Use `pi install`, not `npm install`. The `pi install` command registers the extension in pi's settings so it auto-activates in Go projects.
+
 Or install manually by copying to your extensions directory:
 
 ```bash
