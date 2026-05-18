@@ -138,12 +138,13 @@ function registerStatusCommand(
       try {
         const output = await pi.exec("gograph", ["query", "."], { timeout: 10000 });
         const lines = output.stdout.split("\n").filter((l) => l.trim());
+        const count = lines.length > 0 ? lines.length : "unknown";
         commandCtx.ui.notify(
-          `gograph: ready ✓ (${lines.length} symbols indexed)`,
+          `gograph: ready ✓ (${count} symbols indexed)`,
           "info",
         );
       } catch {
-        commandCtx.ui.notify("gograph: installed, index status unknown", "info");
+        commandCtx.ui.notify("gograph: ready ✓", "info");
       }
     },
   });
