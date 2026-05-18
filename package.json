@@ -8,9 +8,12 @@
     "test:watch": "vitest"
   },
   "pi": {
-    "extensions": ["./src/index.ts"]
+    "extensions": [
+      "./src/index.ts"
+    ]
   },
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "file:../../.nvm/versions/node/v22.16.0/lib/node_modules/@earendil-works/pi-coding-agent",
     "vitest": "^3.0.0"
   }
 }
