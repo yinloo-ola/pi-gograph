@@ -2,6 +2,10 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { isGographInstalled } from "./detect.js";
 import { runGograph } from "./runner.js";
 
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 interface CommandOptions {
   installed: boolean;
   hasIdx: boolean;
@@ -93,8 +97,7 @@ function registerSetupCommand(
           commandCtx.ui.setStatus("gograph", "installed (build had issues)");
         }
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        commandCtx.ui.notify(`Installation failed: ${message}`, "error");
+        commandCtx.ui.notify(`Installation failed: ${getErrorMessage(err)}`, "error");
         commandCtx.ui.setStatus("gograph", "installation failed");
       }
     },
@@ -178,8 +181,7 @@ function registerBuildCommand(
           commandCtx.ui.setStatus("gograph", "build failed");
         }
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        commandCtx.ui.notify(`Build failed: ${message}`, "error");
+        commandCtx.ui.notify(`Build failed: ${getErrorMessage(err)}`, "error");
         commandCtx.ui.setStatus("gograph", "build failed");
       }
     },

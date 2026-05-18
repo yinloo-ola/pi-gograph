@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { access, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -61,7 +62,6 @@ async function hasGoFilesRecursive(
  */
 export async function isGographInstalled(): Promise<boolean> {
   try {
-    const { execSync } = await import("node:child_process");
     execSync("gograph --version", { timeout: 3000, stdio: "ignore" });
     return true;
   } catch {
