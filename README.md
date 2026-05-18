@@ -3,6 +3,8 @@
 [![npm version](https://img.shields.io/npm/v/pi-gograph.svg)](https://www.npmjs.com/package/pi-gograph)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+![pi-gograph preview](image.jpg)
+
 [Gograph](https://github.com/ozgurcd/gograph) integration for [pi](https://github.com/earendil-works/pi-mono) — AST-aware Go code navigation as native LLM tools.
 
 ## What it does
