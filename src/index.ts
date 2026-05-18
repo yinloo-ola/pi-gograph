@@ -34,11 +34,18 @@ export default function gographExtension(pi: ExtensionAPI) {
 
   // Detect and register on session start
   pi.on("session_start", async (_event, ctx) => {
-    const goRepo = await isGoRepo(ctx.cwd);
-    if (!goRepo) return; // Extension invisible in non-Go projects
+    try {
+      ctx.ui.notify("pi-gograph: session_start fired", "info");
 
-    const installed = await isGographInstalled();
-    const hasIdx = installed ? await hasIndex(ctx.cwd) : false;
+      const goRepo = await isGoRepo(ctx.cwd);
+      if (!goRepo) return; // Extension invisible in non-Go projects
+
+      ctx.ui.notify(`pi-gograph: Go repo detected at ${ctx.cwd}`, "info");
+
+      const installed = await isGographInstalled();
+      const hasIdx = installed ? await hasIndex(ctx.cwd) : false;
+
+      ctx.ui.notify(`pi-gograph: installed=${installed}, hasIdx=${hasIdx}`, "info");
 
     // Always register tools (execute() handles missing gograph gracefully)
     registerTools(pi);
@@ -65,5 +72,8 @@ export default function gographExtension(pi: ExtensionAPI) {
 
     // Show appropriate status
     showStatus(ctx, { installed, hasIdx });
+    } catch (err) {
+      ctx.ui.notify(`pi-gograph error: ${err instanceof Error ? err.message : String(err)}`, "error");
+    }
   });
 }
