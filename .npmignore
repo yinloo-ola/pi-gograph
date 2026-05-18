@@ -1,0 +1,7 @@
+__tests__/
+docs/
+.git/
+.github/
+*.test.ts
+tsconfig.json
+vitest.config.ts
