@@ -3,17 +3,38 @@
   "version": "0.1.0",
   "description": "Gograph integration for pi — AST-aware Go code navigation",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yinloo-ola/pi-gograph.git"
+  },
+  "homepage": "https://github.com/yinloo-ola/pi-gograph",
+  "bugs": {
+    "url": "https://github.com/yinloo-ola/pi-gograph/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "gograph",
+    "golang",
+    "go",
+    "ast",
+    "code-navigation",
+    "pi-extension"
+  ],
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "pi": {
-    "extensions": [
-      "./src/index.ts"
-    ]
+    "extensions": ["./src/index.ts"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "file:../../.nvm/versions/node/v22.16.0/lib/node_modules/@earendil-works/pi-coding-agent",
+    "@earendil-works/pi-coding-agent": "^0.74.1",
     "@earendil-works/pi-tui": "^0.74.1",
     "typebox": "^1.1.38",
     "typescript": "^6.0.3",
