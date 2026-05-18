@@ -1,8 +1,14 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Text } from "@earendil-works/pi-tui";
 import { isGographInstalled, hasIndex } from "./detect.js";
 import { runGograph, formatOutput } from "./runner.js";
+import {
+  clearBackgroundStatus,
+  getCurrentIndexState,
+  scheduleBackgroundRefresh,
+  writeIndexState,
+} from "./refresh.js";
 
 // ── Parameter schemas ────────────────────────────────────────────────────────
 
@@ -83,7 +89,9 @@ const PathParams = Type.Object({
 
 // ── Guard helper ─────────────────────────────────────────────────────────────
 
-async function ensureReady(cwd: string): Promise<void> {
+async function ensureReady(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
+  scheduleBackgroundRefresh(pi, ctx.cwd, ctx.ui);
+
   if (!(await isGographInstalled())) {
     throw new Error(
       "gograph is not installed. Run `/gograph-setup` or install manually:\n" +
@@ -91,7 +99,7 @@ async function ensureReady(cwd: string): Promise<void> {
       "  go install github.com/ozgurcd/gograph/cmd/gograph@latest",
     );
   }
-  if (!(await hasIndex(cwd))) {
+  if (!(await hasIndex(ctx.cwd))) {
     throw new Error(
       "No gograph index found. Run `gograph build .` or use the gograph_build tool.",
     );
@@ -135,9 +143,17 @@ function registerBuildTool(pi: ExtensionAPI): void {
           "gograph is not installed. Run `/gograph-setup` or: brew install ozgurcd/tap/gograph",
         );
       }
+
+      clearBackgroundStatus();
+
+      const currentState = await getCurrentIndexState(pi, ctx.cwd);
+
       const args = ["build", "."];
       if (params.precise) args.push("--precise");
-      const output = await runGograph(args, signal);
+      const output = await runGograph(args, signal, 60_000);
+      if (currentState) {
+        await writeIndexState(ctx.cwd, currentState);
+      }
       const { text } = formatOutput(output);
       return {
         content: [{ type: "text", text: text || "Index built successfully." }],
@@ -169,7 +185,7 @@ function registerQueryTool(pi: ExtensionAPI): void {
     ],
     parameters: QueryParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(ctx.cwd);
+      await ensureReady(pi, ctx);
       const output = await runGograph(["query", params.query, "--json"], signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
@@ -209,7 +225,7 @@ function registerContextTool(pi: ExtensionAPI): void {
     ],
     parameters: ContextParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(ctx.cwd);
+      await ensureReady(pi, ctx);
       const output = await runGograph(["context", params.symbol, "--json"], signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
@@ -247,7 +263,7 @@ function registerImplementersTool(pi: ExtensionAPI): void {
     ],
     parameters: ImplementersParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(ctx.cwd);
+      await ensureReady(pi, ctx);
       const output = await runGograph(["implementers", params.interface, "--json"], signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
@@ -280,7 +296,7 @@ function registerImpactTool(pi: ExtensionAPI): void {
     ],
     parameters: ImpactParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(ctx.cwd);
+      await ensureReady(pi, ctx);
       const args: string[] = ["impact"];
       if (params.uncommitted) {
         args.push("--uncommitted");
@@ -330,7 +346,7 @@ function registerSourceTool(pi: ExtensionAPI): void {
     ],
     parameters: SourceParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(ctx.cwd);
+      await ensureReady(pi, ctx);
       const output = await runGograph(["source", params.symbol, "--json"], signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
@@ -364,7 +380,7 @@ function registerCallersTool(pi: ExtensionAPI): void {
     ],
     parameters: CallersParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(ctx.cwd);
+      await ensureReady(pi, ctx);
       const output = await runGograph(["callers", params.symbol, "--json"], signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
@@ -395,7 +411,7 @@ function registerCalleesTool(pi: ExtensionAPI): void {
     ],
     parameters: CalleesParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(ctx.cwd);
+      await ensureReady(pi, ctx);
       const output = await runGograph(["callees", params.symbol, "--json"], signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
@@ -427,7 +443,7 @@ function registerEndpointTool(pi: ExtensionAPI): void {
     ],
     parameters: EndpointParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(ctx.cwd);
+      await ensureReady(pi, ctx);
       const output = await runGograph(["endpoint", params.target, "--json"], signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
@@ -462,7 +478,7 @@ function registerCheckTool(pi: ExtensionAPI): void {
     ],
     parameters: CheckParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(ctx.cwd);
+      await ensureReady(pi, ctx);
       const args = ["check"];
       if (params.uncommitted !== false) args.push("--uncommitted");
       const output = await runGograph(args, signal);
@@ -496,7 +512,7 @@ function registerFocusTool(pi: ExtensionAPI): void {
     ],
     parameters: FocusParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(ctx.cwd);
+      await ensureReady(pi, ctx);
       const output = await runGograph(["focus", params.package, "--json"], signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
@@ -527,7 +543,7 @@ function registerFieldsTool(pi: ExtensionAPI): void {
     ],
     parameters: FieldsParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(ctx.cwd);
+      await ensureReady(pi, ctx);
       const output = await runGograph(["fields", params.struct, "--json"], signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
@@ -558,7 +574,7 @@ function registerPathTool(pi: ExtensionAPI): void {
     ],
     parameters: PathParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(ctx.cwd);
+      await ensureReady(pi, ctx);
       const output = await runGograph(["path", params.from, params.to, "--json"], signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {

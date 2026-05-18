@@ -3,6 +3,7 @@ import { isGoRepo, isGographInstalled, hasIndex } from "./detect.js";
 import { initRunner } from "./runner.js";
 import { registerTools } from "./tools.js";
 import { registerCommands } from "./commands.js";
+import { getBackgroundStatus, scheduleBackgroundRefresh } from "./refresh.js";
 
 interface StatusOptions {
   installed: boolean;
@@ -22,6 +23,12 @@ function showStatus(
 
   if (!hasIdx) {
     ctx.ui.setStatus("gograph", "gograph: run /gograph-build");
+    return;
+  }
+
+  const background = getBackgroundStatus();
+  if (background) {
+    ctx.ui.setStatus("gograph", background);
     return;
   }
 
@@ -58,6 +65,7 @@ export default function gographExtension(pi: ExtensionAPI) {
         });
       }
 
+      scheduleBackgroundRefresh(pi, ctx.cwd, ctx.ui);
       showStatus(ctx, { installed, hasIdx });
     } catch (err) {
       ctx.ui.notify(

@@ -30,6 +30,7 @@ export function initRunner(exec: ExecFn): void {
 export async function runGograph(
   args: string[],
   signal?: AbortSignal,
+  timeout = 30_000,
 ): Promise<string> {
   if (!execFn) {
     throw new Error("Runner not initialized. Call initRunner() first.");
@@ -37,7 +38,7 @@ export async function runGograph(
 
   const result = await execFn("gograph", args, {
     signal,
-    timeout: 30_000,
+    timeout,
   });
 
   if (result.code !== 0) {

@@ -44,6 +44,7 @@ The extension activates automatically in Go projects (detected by `go.mod` or `*
 - `📦 gograph: run /gograph-setup` — gograph not installed
 - `gograph: run /gograph-build` — installed but no index
 - `gograph ✓` — ready
+- `gograph: rebuilding index in background...` — a branch/HEAD change was detected and a refresh is running without blocking other work
 
 ### First time setup
 
@@ -76,6 +77,10 @@ Or with precise mode (type-checked, slower):
 ```
 /gograph-status
 ```
+
+### Automatic background refresh
+
+When you switch git branches or otherwise change the tracked HEAD, pi-gograph will refresh the index in the background the next time you use a gograph tool or `/gograph-status`. Existing operations keep using the last built index until the refresh finishes.
 
 ## Tools
 

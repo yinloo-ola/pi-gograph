@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.7
+
+### Added
+
+- Automatic background index refresh when the git HEAD changes (including branch switches)
+- Persistent per-repo index state file at `.gograph/pi-gograph-state.json`
+
+### Fixed
+
+- `/gograph-setup` and `/gograph-build` now record index state for freshness checks
+- `gograph_build` tool now records index state after successful builds
+
 ## 0.1.4
 
 ### Fixed

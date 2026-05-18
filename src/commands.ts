@@ -1,6 +1,13 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { isGographInstalled } from "./detect.js";
 import { runGograph } from "./runner.js";
+import {
+  clearBackgroundStatus,
+  getBackgroundStatus,
+  getCurrentIndexState,
+  scheduleBackgroundRefresh,
+  writeIndexState,
+} from "./refresh.js";
 
 function getErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -23,7 +30,7 @@ export function registerCommands(
 
 function registerSetupCommand(
   pi: ExtensionAPI,
-  ctx: ExtensionContext,
+  _ctx: ExtensionContext,
   installed: boolean,
 ): void {
   pi.registerCommand("gograph-setup", {
@@ -37,7 +44,6 @@ function registerSetupCommand(
         return;
       }
 
-      // Check for brew
       let useBrew = false;
       try {
         const { code } = await pi.exec("brew", ["--version"], { timeout: 5000 });
@@ -62,7 +68,6 @@ function registerSetupCommand(
       try {
         let installOk = false;
 
-        // Try brew first, fall back to go install
         if (useBrew) {
           const brewResult = await pi.exec("brew", ["install", "ozgurcd/tap/gograph"], {
             timeout: 120_000,
@@ -82,33 +87,32 @@ function registerSetupCommand(
 
         if (!installOk) throw new Error("Installation failed");
 
-        // Verify installation
-        const { code } = await pi.exec("gograph", ["--version"], { timeout: 5000 });
-        if (code !== 0) throw new Error("Installation verification failed");
-
-        commandCtx.ui.notify("gograph installed successfully!", "info");
-
-        // Auto-build index
-        commandCtx.ui.setStatus("gograph", "building index...");
-        commandCtx.ui.notify("Building index...", "info");
-
-        const buildOutput = await pi.exec("gograph", ["build", "."], {
-          timeout: 60_000,
-        });
-
-        if (buildOutput.code === 0) {
-          commandCtx.ui.notify("Index built successfully!", "info");
-          commandCtx.ui.setStatus("gograph", "ready ✓");
-        } else {
-          commandCtx.ui.notify(
-            `Index build had issues: ${buildOutput.stderr}`,
-            "warning",
-          );
-          commandCtx.ui.setStatus("gograph", "installed (build had issues)");
-        }
+        const verifyResult = await pi.exec("gograph", ["--version"], { timeout: 5000 });
+        if (verifyResult.code !== 0) throw new Error("Installation verification failed");
       } catch (err: unknown) {
         commandCtx.ui.notify(`Installation failed: ${getErrorMessage(err)}`, "error");
         commandCtx.ui.setStatus("gograph", "installation failed");
+        return;
+      }
+
+      commandCtx.ui.notify("gograph installed successfully!", "info");
+
+      clearBackgroundStatus();
+      commandCtx.ui.setStatus("gograph", "building index...");
+      commandCtx.ui.notify("Building index...", "info");
+
+      try {
+        const currentState = await getCurrentIndexState(pi, commandCtx.cwd);
+        await runGograph(["build", "."], undefined, 60_000);
+        if (currentState) {
+          await writeIndexState(commandCtx.cwd, currentState);
+        }
+
+        commandCtx.ui.notify("Index built successfully!", "info");
+        commandCtx.ui.setStatus("gograph", "gograph ✓");
+      } catch (err: unknown) {
+        commandCtx.ui.notify(`Index build failed: ${getErrorMessage(err)}`, "error");
+        commandCtx.ui.setStatus("gograph", "build failed");
       }
     },
   });
@@ -116,12 +120,14 @@ function registerSetupCommand(
 
 function registerStatusCommand(
   pi: ExtensionAPI,
-  ctx: ExtensionContext,
+  _ctx: ExtensionContext,
   options: CommandOptions,
 ): void {
   pi.registerCommand("gograph-status", {
     description: "Show gograph installation and index status",
     handler: async (_args, commandCtx) => {
+      scheduleBackgroundRefresh(pi, commandCtx.cwd, commandCtx.ui);
+
       const { installed, hasIdx } = options;
 
       if (!installed) {
@@ -131,6 +137,12 @@ function registerStatusCommand(
 
       if (!hasIdx) {
         commandCtx.ui.notify("gograph: installed, no index", "info");
+        return;
+      }
+
+      const background = getBackgroundStatus();
+      if (background) {
+        commandCtx.ui.notify(background, "info");
         return;
       }
 
@@ -164,6 +176,7 @@ function registerBuildCommand(
       const cmdArgs = ["build", "."];
       if (precise) cmdArgs.push("--precise");
 
+      clearBackgroundStatus();
       commandCtx.ui.setStatus("gograph", "building index...");
       commandCtx.ui.notify(
         `Building gograph index${precise ? " (precise mode)" : ""}...`,
@@ -171,15 +184,14 @@ function registerBuildCommand(
       );
 
       try {
-        const output = await pi.exec("gograph", cmdArgs, { timeout: 60_000 });
-
-        if (output.code === 0) {
-          commandCtx.ui.notify("gograph index built successfully!", "info");
-          commandCtx.ui.setStatus("gograph", "ready ✓");
-        } else {
-          commandCtx.ui.notify(`Build failed: ${output.stderr}`, "error");
-          commandCtx.ui.setStatus("gograph", "build failed");
+        const currentState = await getCurrentIndexState(pi, commandCtx.cwd);
+        await runGograph(cmdArgs, undefined, 60_000);
+        if (currentState) {
+          await writeIndexState(commandCtx.cwd, currentState);
         }
+
+        commandCtx.ui.notify("gograph index built successfully!", "info");
+        commandCtx.ui.setStatus("gograph", "gograph ✓");
       } catch (err: unknown) {
         commandCtx.ui.notify(`Build failed: ${getErrorMessage(err)}`, "error");
         commandCtx.ui.setStatus("gograph", "build failed");
