@@ -72,9 +72,9 @@ export function formatOutput(raw: string): {
 
   if (truncation.truncated) {
     const omittedLines = truncation.totalLines - truncation.outputLines;
-    text += `\n\n[Output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines`;
-    text += ` (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}).`;
-    text += ` ${omittedLines} lines omitted. Narrow your query.]`;
+    text += `\n\n[Output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines` +
+      ` (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}).` +
+      ` ${omittedLines} lines omitted. Narrow your query.]`;
   }
 
   return {
