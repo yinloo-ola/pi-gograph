@@ -60,17 +60,27 @@ function registerSetupCommand(
       commandCtx.ui.notify("Installing gograph...", "info");
 
       try {
+        let installOk = false;
+
+        // Try brew first, fall back to go install
         if (useBrew) {
-          await pi.exec("brew", ["install", "ozgurcd/tap/gograph"], {
+          const brewResult = await pi.exec("brew", ["install", "ozgurcd/tap/gograph"], {
             timeout: 120_000,
           });
-        } else {
-          await pi.exec(
+          installOk = brewResult.code === 0;
+        }
+
+        if (!installOk) {
+          commandCtx.ui.notify("Falling back to go install...", "info");
+          const goResult = await pi.exec(
             "go",
             ["install", "github.com/ozgurcd/gograph/cmd/gograph@latest"],
             { timeout: 120_000 },
           );
+          installOk = goResult.code === 0;
         }
+
+        if (!installOk) throw new Error("Installation failed");
 
         // Verify installation
         const { code } = await pi.exec("gograph", ["--version"], { timeout: 5000 });
