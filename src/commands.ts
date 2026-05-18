@@ -134,18 +134,7 @@ function registerStatusCommand(
         return;
       }
 
-      // Try to get index stats
-      try {
-        const output = await pi.exec("gograph", ["query", "."], { timeout: 10000 });
-        const lines = output.stdout.split("\n").filter((l) => l.trim());
-        const count = lines.length > 0 ? lines.length : "unknown";
-        commandCtx.ui.notify(
-          `gograph: ready ✓ (${count} symbols indexed)`,
-          "info",
-        );
-      } catch {
-        commandCtx.ui.notify("gograph: ready ✓", "info");
-      }
+      commandCtx.ui.notify("gograph: ready ✓", "info");
     },
   });
 }
