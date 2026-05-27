@@ -102,6 +102,23 @@ const PlanParams = Type.Object({
   ),
 });
 
+const ExplainParams = Type.Object({
+  symbol: Type.String({ description: "Symbol name to get an architectural narrative for." }),
+});
+
+const ReviewParams = Type.Object({
+  symbol: Type.Optional(
+    Type.String({ description: "Symbol to review. Required unless uncommitted=true." }),
+  ),
+  uncommitted: Type.Optional(
+    Type.Boolean({ description: "Review all uncommitted changes. Default: false." }),
+  ),
+});
+
+const ReturnUsageParams = Type.Object({
+  symbol: Type.String({ description: "Function name to check how callers consume its return value." }),
+});
+
 // ── Guard helper ─────────────────────────────────────────────────────────────
 
 async function ensureReady(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
@@ -138,6 +155,9 @@ export function registerTools(pi: ExtensionAPI): void {
   registerFieldsTool(pi);
   registerPathTool(pi);
   registerPlanTool(pi);
+  registerExplainTool(pi);
+  registerReviewTool(pi);
+  registerReturnUsageTool(pi);
 }
 
 function registerBuildTool(pi: ExtensionAPI): void {
@@ -657,6 +677,134 @@ function registerPlanTool(pi: ExtensionAPI): void {
       if (isPartial) return new Text(theme.fg("warning", "Planning..."), 0, 0);
       const details = result.details as { truncated?: boolean } | undefined;
       let text = theme.fg("success", "✓ Plan ready");
+      if (details?.truncated) text += theme.fg("warning", " (truncated)");
+      if (expanded && result.content[0]?.type === "text") {
+        text += "\n" + theme.fg("dim", result.content[0].text.slice(0, 3000));
+      }
+      return new Text(text, 0, 0);
+    },
+  });
+}
+
+function registerExplainTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "gograph_explain",
+    label: "Gograph Explain",
+    description:
+      "Get an LLM-ready architectural narrative for a Go symbol in ONE call. Synthesizes callers, callees, complexity, SQL, routes, tests, and role classification. Collapses 6-8 separate tool calls into one.",
+    promptSnippet: "Get architectural narrative for a Go symbol",
+    promptGuidelines: [
+      "Use gograph_explain when you need a comprehensive understanding of a Go symbol's role and relationships.",
+    ],
+    parameters: ExplainParams,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      await ensureReady(pi, ctx);
+      const output = await runGograph(["explain", params.symbol, "--json"], signal);
+      const { text, truncated, totalLines } = formatOutput(output);
+      return {
+        content: [{ type: "text", text }],
+        details: { symbol: params.symbol, truncated, totalLines },
+      };
+    },
+    renderCall(args, theme) {
+      let text = theme.fg("toolTitle", theme.bold("gograph_explain "));
+      text += theme.fg("accent", `"${args.symbol}"`);
+      return new Text(text, 0, 0);
+    },
+    renderResult(result, { isPartial, expanded }, theme) {
+      if (isPartial) return new Text(theme.fg("warning", "Explaining..."), 0, 0);
+      const details = result.details as { truncated?: boolean } | undefined;
+      let text = theme.fg("success", "✓ Explanation ready");
+      if (details?.truncated) text += theme.fg("warning", " (truncated)");
+      if (expanded && result.content[0]?.type === "text") {
+        text += "\n" + theme.fg("dim", result.content[0].text.slice(0, 3000));
+      }
+      return new Text(text, 0, 0);
+    },
+  });
+}
+
+function registerReviewTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "gograph_review",
+    label: "Gograph Review",
+    description:
+      "Post-edit review for a Go symbol or uncommitted changes. Checks: are all callers tested, did complexity increase, were new SQL or env reads introduced, were any interfaces broken. Run after editing, before committing.",
+    promptSnippet: "Review Go code changes for issues",
+    promptGuidelines: [
+      "Use gograph_review AFTER editing Go code to verify nothing is broken before committing.",
+      "Use gograph_review with uncommitted=true to review all uncommitted changes at once.",
+    ],
+    parameters: ReviewParams,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      await ensureReady(pi, ctx);
+      const args: string[] = ["review"];
+      if (params.uncommitted) {
+        args.push("--uncommitted");
+      } else if (params.symbol) {
+        args.push(params.symbol);
+      } else {
+        throw new Error("Provide either a symbol name or set uncommitted=true.");
+      }
+      args.push("--json");
+      const output = await runGograph(args, signal);
+      const { text, truncated, totalLines } = formatOutput(output);
+      return {
+        content: [{ type: "text", text }],
+        details: { symbol: params.symbol, uncommitted: params.uncommitted ?? false, truncated, totalLines },
+      };
+    },
+    renderCall(args, theme) {
+      let text = theme.fg("toolTitle", theme.bold("gograph_review "));
+      if (args.uncommitted) {
+        text += theme.fg("accent", "--uncommitted");
+      } else {
+        text += theme.fg("accent", `"${args.symbol}"`);
+      }
+      return new Text(text, 0, 0);
+    },
+    renderResult(result, { isPartial, expanded }, theme) {
+      if (isPartial) return new Text(theme.fg("warning", "Reviewing..."), 0, 0);
+      const details = result.details as { truncated?: boolean } | undefined;
+      let text = theme.fg("success", "✓ Review complete");
+      if (details?.truncated) text += theme.fg("warning", " (truncated)");
+      if (expanded && result.content[0]?.type === "text") {
+        text += "\n" + theme.fg("dim", result.content[0].text.slice(0, 3000));
+      }
+      return new Text(text, 0, 0);
+    },
+  });
+}
+
+function registerReturnUsageTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "gograph_returnusage",
+    label: "Gograph Return Usage",
+    description:
+      "Shows how each caller consumes a function's return value (discarded, assigned, returned, goroutine, deferred, passed). Critical before changing a return signature.",
+    promptSnippet: "Check how callers consume a Go function's return value",
+    promptGuidelines: [
+      "Use gograph_returnusage before changing a Go function's return signature to see which callers silently discard the return.",
+    ],
+    parameters: ReturnUsageParams,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      await ensureReady(pi, ctx);
+      const output = await runGograph(["returnusage", params.symbol, "--json"], signal);
+      const { text, truncated, totalLines } = formatOutput(output);
+      return {
+        content: [{ type: "text", text }],
+        details: { symbol: params.symbol, truncated, totalLines },
+      };
+    },
+    renderCall(args, theme) {
+      let text = theme.fg("toolTitle", theme.bold("gograph_returnusage "));
+      text += theme.fg("accent", `"${args.symbol}"`);
+      return new Text(text, 0, 0);
+    },
+    renderResult(result, { isPartial, expanded }, theme) {
+      if (isPartial) return new Text(theme.fg("warning", "Analyzing return usage..."), 0, 0);
+      const details = result.details as { truncated?: boolean } | undefined;
+      let text = theme.fg("success", "✓ Return usage found");
       if (details?.truncated) text += theme.fg("warning", " (truncated)");
       if (expanded && result.content[0]?.type === "text") {
         text += "\n" + theme.fg("dim", result.content[0].text.slice(0, 3000));
