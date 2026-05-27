@@ -29,14 +29,24 @@ const QueryParams = Type.Object({
 });
 
 const ContextParams = Type.Object({
-  symbol: Type.String({
-    description:
-      "Symbol name (function, method, struct, interface). Returns node info, source, callers, callees, and tests in one call.",
-  }),
+  symbol: Type.Optional(
+    Type.String({
+      description:
+        "Symbol name (function, method, struct, interface). Required unless uncommitted=true.",
+    }),
+  ),
+  uncommitted: Type.Optional(
+    Type.Boolean({
+      description: "Bundle context for all uncommitted modified symbols. Default: false.",
+    }),
+  ),
 });
 
 const ImplementersParams = Type.Object({
   interface: Type.String({ description: "Interface name to find implementations for" }),
+  testOnly: Type.Optional(
+    Type.Boolean({ description: "Filter to test/mock implementations only. Default: false." }),
+  ),
 });
 
 const ImpactParams = Type.Object({
@@ -47,6 +57,9 @@ const ImpactParams = Type.Object({
     Type.Boolean({
       description: "Calculate blast radius of all uncommitted code changes. Default: false.",
     }),
+  ),
+  since: Type.Optional(
+    Type.String({ description: "Git ref — blast radius of all symbols changed since that ref (e.g. 'main', 'v1.0')." }),
   ),
   filesOnly: Type.Optional(
     Type.Boolean({ description: "Return only file paths. Default: false." }),
@@ -327,21 +340,33 @@ function registerContextTool(pi: ExtensionAPI): void {
     parameters: ContextParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       await ensureReady(pi, ctx);
-      const output = await runGograph(["context", params.symbol, "--json"], signal);
+      let args: string[];
+      if (params.uncommitted) {
+        args = ["context", "--uncommitted", "--json"];
+      } else if (params.symbol) {
+        args = ["context", params.symbol, "--json"];
+      } else {
+        throw new Error("Provide either a symbol name or set uncommitted=true.");
+      }
+      const output = await runGograph(args, signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
         content: [{ type: "text", text }],
-        details: { symbol: params.symbol, truncated, totalLines },
+        details: { symbol: params.symbol, uncommitted: params.uncommitted ?? false, truncated, totalLines },
       };
     },
     renderCall(args, theme) {
       let text = theme.fg("toolTitle", theme.bold("gograph_context "));
-      text += theme.fg("accent", `"${args.symbol}"`);
+      if (args.uncommitted) {
+        text += theme.fg("accent", "--uncommitted");
+      } else {
+        text += theme.fg("accent", `"${args.symbol}"`);
+      }
       return new Text(text, 0, 0);
     },
     renderResult(result, { isPartial, expanded }, theme) {
       if (isPartial) return new Text(theme.fg("warning", "Analyzing..."), 0, 0);
-      const details = result.details as { symbol: string; truncated?: boolean } | undefined;
+      const details = result.details as { symbol?: string; uncommitted?: boolean; truncated?: boolean } | undefined;
       let text = theme.fg("success", "✓ Context retrieved");
       if (details?.truncated) text += theme.fg("warning", " (truncated)");
       if (expanded && result.content[0]?.type === "text") {
@@ -365,16 +390,20 @@ function registerImplementersTool(pi: ExtensionAPI): void {
     parameters: ImplementersParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       await ensureReady(pi, ctx);
-      const output = await runGograph(["implementers", params.interface, "--json"], signal);
+      const args: string[] = ["implementers", params.interface];
+      if (params.testOnly) args.push("--test-only");
+      args.push("--json");
+      const output = await runGograph(args, signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
         content: [{ type: "text", text }],
-        details: { interface: params.interface, truncated, totalLines },
+        details: { interface: params.interface, testOnly: params.testOnly ?? false, truncated, totalLines },
       };
     },
     renderCall(args, theme) {
       let text = theme.fg("toolTitle", theme.bold("gograph_implementers "));
       text += theme.fg("accent", `"${args.interface}"`);
+      if (args.testOnly) text += theme.fg("accent", " --test-only");
       return new Text(text, 0, 0);
     },
     renderResult(result, { isPartial }, theme) {
@@ -403,21 +432,25 @@ function registerImpactTool(pi: ExtensionAPI): void {
         args.push("--uncommitted");
       } else if (params.symbol) {
         args.push(params.symbol);
+      } else if (params.since) {
+        args.push("--since", params.since);
       } else {
-        throw new Error("Provide either a symbol name or set uncommitted=true.");
+        throw new Error("Provide either a symbol name, uncommitted=true, or since=<git ref>.");
       }
       if (params.filesOnly) args.push("--files-only");
       const output = await runGograph(args, signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
         content: [{ type: "text", text }],
-        details: { symbol: params.symbol, uncommitted: params.uncommitted ?? false, truncated, totalLines },
+        details: { symbol: params.symbol, uncommitted: params.uncommitted ?? false, since: params.since, truncated, totalLines },
       };
     },
     renderCall(args, theme) {
       let text = theme.fg("toolTitle", theme.bold("gograph_impact "));
       if (args.uncommitted) {
         text += theme.fg("accent", "--uncommitted");
+      } else if (args.since) {
+        text += theme.fg("accent", `--since "${args.since}"`);
       } else {
         text += theme.fg("accent", `"${args.symbol}"`);
       }
