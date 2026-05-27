@@ -70,6 +70,19 @@ export async function isGographInstalled(): Promise<boolean> {
 }
 
 /**
+ * Get the installed gograph version string.
+ * Returns null if gograph is not installed or version cannot be determined.
+ */
+export function getGographVersion(): string | null {
+  try {
+    const output = execSync("gograph --version", { timeout: 3000 }).toString().trim();
+    return output.length > 0 ? output : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Check if a gograph index exists in the project.
  */
 export async function hasIndex(cwd: string): Promise<boolean> {

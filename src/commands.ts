@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { hasIndex as hasGographIndex, isGographInstalled } from "./detect.js";
+import { hasIndex as hasGographIndex, isGographInstalled, getGographVersion } from "./detect.js";
 import { runGograph } from "./runner.js";
 import {
   clearBackgroundStatus,
@@ -121,9 +121,12 @@ function registerStatusCommand(pi: ExtensionAPI): void {
         return;
       }
 
+      const version = getGographVersion();
+      const versionSuffix = version ? ` (${version})` : "";
+
       const indexed = await hasGographIndex(commandCtx.cwd);
       if (!indexed) {
-        commandCtx.ui.notify("gograph: installed, no index", "info");
+        commandCtx.ui.notify(`gograph: installed, no index${versionSuffix}`, "info");
         return;
       }
 
@@ -133,7 +136,7 @@ function registerStatusCommand(pi: ExtensionAPI): void {
         return;
       }
 
-      commandCtx.ui.notify("gograph: ready ✓", "info");
+      commandCtx.ui.notify(`gograph: ready ✓${versionSuffix}`, "info");
     },
   });
 }

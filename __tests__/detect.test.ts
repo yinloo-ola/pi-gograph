@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { isGoRepo, hasIndex } from "../src/detect.js";
+import { isGoRepo, hasIndex, getGographVersion } from "../src/detect.js";
 
 describe("isGoRepo", () => {
   let tempDir: string;
@@ -67,5 +67,15 @@ describe("hasIndex", () => {
   it("returns false when .gograph exists but graph.json does not", async () => {
     await mkdir(join(tempDir, ".gograph"));
     expect(await hasIndex(tempDir)).toBe(false);
+  });
+});
+
+describe("getGographVersion", () => {
+  it("returns string when gograph is installed, null otherwise", () => {
+    const result = getGographVersion();
+    expect(result === null || typeof result === "string").toBe(true);
+    if (result !== null) {
+      expect(result.length).toBeGreaterThan(0);
+    }
   });
 });
