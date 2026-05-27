@@ -87,20 +87,30 @@ When you switch git branches or otherwise change the tracked HEAD, pi-gograph wi
 ## Tools
 
 | Tool | Purpose |
-|------|---------|
+|------|--------|
 | `gograph_build` | Build/rebuild the AST index |
 | `gograph_query` | Search for symbols by name |
-| `gograph_context` | Full context bundle (source + callers + callees + tests) |
-| `gograph_implementers` | Find structs implementing an interface |
-| `gograph_impact` | Blast radius analysis |
+| `gograph_context` | Full context bundle (source + callers + callees + tests). Supports `--uncommitted` for all modified symbols. |
+| `gograph_implementers` | Find structs implementing an interface. Supports `--test-only` for mock/test implementations. |
+| `gograph_impact` | Blast radius analysis. Supports `--uncommitted`, `--since <ref>`. |
 | `gograph_source` | Extract source of one symbol |
-| `gograph_callers` | Find callers of a function |
-| `gograph_callees` | Find callees of a function |
+| `gograph_callers` | Find callers of a function. Supports `--depth N` for multi-hop traversal. |
+| `gograph_callees` | Find callees of a function. Supports `--depth N` for multi-hop traversal. |
 | `gograph_endpoint` | HTTP handler → SQL vertical slice |
 | `gograph_check` | Verify uncommitted changes |
 | `gograph_focus` | Targeted context for a package |
 | `gograph_fields` | All fields of a struct |
 | `gograph_path` | Shortest call chain between two symbols |
+| `gograph_plan` | Pre-edit change plan: callers, tests, blast radius, SQL/env exposure. Supports `--uncommitted` and `--with-context`. |
+| `gograph_review` | Post-edit review: test coverage, complexity, broken interfaces |
+| `gograph_explain` | Architectural narrative for any symbol in one call |
+| `gograph_returnusage` | How callers consume a function's return value |
+| `gograph_errorflow` | Trace error string from definition to handlers |
+| `gograph_changes` | Find symbols in changed files. Supports `--git <ref>`. |
+| `gograph_stats` | Index health summary: version, timestamp, counts |
+| `gograph_dependents` | Find packages that import a given package |
+| `gograph_usages` | Find all references to a type in signatures and fields |
+| `gograph_literals` | Find all struct literal initialization sites |
 
 ## Development
 
