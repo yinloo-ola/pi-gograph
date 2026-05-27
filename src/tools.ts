@@ -119,6 +119,24 @@ const ReturnUsageParams = Type.Object({
   symbol: Type.String({ description: "Function name to check how callers consume its return value." }),
 });
 
+const ErrorFlowParams = Type.Object({
+  term: Type.String({ description: "Error string or search term to trace through the call chain." }),
+  noTests: Type.Optional(
+    Type.Boolean({ description: "Skip collecting related tests. Default: false." }),
+  ),
+});
+
+const ChangesParams = Type.Object({
+  git: Type.Optional(
+    Type.String({ description: "Git ref to compare against (e.g. 'main', 'HEAD~5', 'v1.0'). Returns symbols in files changed since that ref." }),
+  ),
+  filesOnly: Type.Optional(
+    Type.Boolean({ description: "Return only file paths, not symbols. Default: false." }),
+  ),
+});
+
+const StatsParams = Type.Object({});
+
 // ── Guard helper ─────────────────────────────────────────────────────────────
 
 async function ensureReady(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
@@ -158,6 +176,9 @@ export function registerTools(pi: ExtensionAPI): void {
   registerExplainTool(pi);
   registerReviewTool(pi);
   registerReturnUsageTool(pi);
+  registerErrorFlowTool(pi);
+  registerChangesTool(pi);
+  registerStatsTool(pi);
 }
 
 function registerBuildTool(pi: ExtensionAPI): void {
@@ -810,6 +831,127 @@ function registerReturnUsageTool(pi: ExtensionAPI): void {
         text += "\n" + theme.fg("dim", result.content[0].text.slice(0, 3000));
       }
       return new Text(text, 0, 0);
+    },
+  });
+}
+
+function registerErrorFlowTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "gograph_errorflow",
+    label: "Gograph Error Flow",
+    description:
+      "Trace an error string from its definition up through the call chain to HTTP handlers. Uses AST heuristics — no SSA required.",
+    promptSnippet: "Trace a Go error string through the call chain",
+    promptGuidelines: [
+      "Use gograph_errorflow to understand where an error originates and how it propagates to handlers.",
+    ],
+    parameters: ErrorFlowParams,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      await ensureReady(pi, ctx);
+      const args: string[] = ["errorflow", params.term];
+      if (params.noTests) args.push("--no-tests");
+      args.push("--json");
+      const output = await runGograph(args, signal);
+      const { text, truncated, totalLines } = formatOutput(output);
+      return {
+        content: [{ type: "text", text }],
+        details: { term: params.term, noTests: params.noTests ?? false, truncated, totalLines },
+      };
+    },
+    renderCall(args, theme) {
+      let text = theme.fg("toolTitle", theme.bold("gograph_errorflow "));
+      text += theme.fg("accent", `"${args.term}"`);
+      return new Text(text, 0, 0);
+    },
+    renderResult(result, { isPartial, expanded }, theme) {
+      if (isPartial) return new Text(theme.fg("warning", "Tracing error flow..."), 0, 0);
+      const details = result.details as { truncated?: boolean } | undefined;
+      let text = theme.fg("success", "✓ Error flow traced");
+      if (details?.truncated) text += theme.fg("warning", " (truncated)");
+      if (expanded && result.content[0]?.type === "text") {
+        text += "\n" + theme.fg("dim", result.content[0].text.slice(0, 3000));
+      }
+      return new Text(text, 0, 0);
+    },
+  });
+}
+
+function registerChangesTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "gograph_changes",
+    label: "Gograph Changes",
+    description:
+      "Find symbols in changed files. Default mode uses file modification times. Use git ref to scope changes to a branch or release.",
+    promptSnippet: "Find changed Go symbols",
+    promptGuidelines: [
+      "Use gograph_changes to find what symbols have changed before running impact analysis.",
+      "Use gograph_changes with a git ref to scope changes to a PR branch.",
+    ],
+    parameters: ChangesParams,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      await ensureReady(pi, ctx);
+      const args: string[] = ["changes"];
+      if (params.git) {
+        args.push("--git", params.git);
+      }
+      if (params.filesOnly) args.push("--files-only");
+      args.push("--json");
+      const output = await runGograph(args, signal);
+      const { text, truncated, totalLines } = formatOutput(output);
+      return {
+        content: [{ type: "text", text }],
+        details: { git: params.git, filesOnly: params.filesOnly ?? false, truncated, totalLines },
+      };
+    },
+    renderCall(args, theme) {
+      let text = theme.fg("toolTitle", theme.bold("gograph_changes "));
+      if (args.git) {
+        text += theme.fg("accent", `--git "${args.git}"`);
+      }
+      return new Text(text, 0, 0);
+    },
+    renderResult(result, { isPartial, expanded }, theme) {
+      if (isPartial) return new Text(theme.fg("warning", "Finding changes..."), 0, 0);
+      const details = result.details as { truncated?: boolean } | undefined;
+      let text = theme.fg("success", "✓ Changes found");
+      if (details?.truncated) text += theme.fg("warning", " (truncated)");
+      if (expanded && result.content[0]?.type === "text") {
+        text += "\n" + theme.fg("dim", result.content[0].text.slice(0, 3000));
+      }
+      return new Text(text, 0, 0);
+    },
+  });
+}
+
+function registerStatsTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "gograph_stats",
+    label: "Gograph Stats",
+    description:
+      "Index health summary — schema version, timestamp, symbol/package/call counts. Zero-parse sanity check.",
+    promptSnippet: "Check gograph index health and stats",
+    promptGuidelines: [
+      "Use gograph_stats at the start of a session to confirm the index is populated and current.",
+    ],
+    parameters: StatsParams,
+    async execute(_toolCallId, _params, signal, _onUpdate, _ctx) {
+      // No ensureReady — stats is useful even with a stale or empty index
+      const output = await runGograph(["stats", "--json"], signal);
+      const { text, truncated, totalLines } = formatOutput(output);
+      return {
+        content: [{ type: "text", text }],
+        details: { truncated, totalLines },
+      };
+    },
+    renderCall(_args, theme) {
+      return new Text(theme.fg("toolTitle", theme.bold("gograph_stats")), 0, 0);
+    },
+    renderResult(result, { isPartial, expanded }, theme) {
+      if (isPartial) return new Text(theme.fg("warning", "Fetching stats..."), 0, 0);
+      if (expanded && result.content[0]?.type === "text") {
+        return new Text(theme.fg("dim", result.content[0].text.slice(0, 3000)), 0, 0);
+      }
+      return new Text(theme.fg("success", "✓ Stats retrieved"), 0, 0);
     },
   });
 }
