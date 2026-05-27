@@ -87,6 +87,21 @@ const PathParams = Type.Object({
   to: Type.String({ description: "Target symbol name" }),
 });
 
+const PlanParams = Type.Object({
+  symbol: Type.Optional(
+    Type.String({ description: "Symbol to plan changes for. Required unless uncommitted=true." }),
+  ),
+  uncommitted: Type.Optional(
+    Type.Boolean({ description: "Plan for all uncommitted changes. Default: false." }),
+  ),
+  withContext: Type.Optional(
+    Type.Boolean({
+      description:
+        "Bundle full context (source, callers, callees, role, tests) for every inspect_first symbol. Eliminates N follow-up context calls. Default: false.",
+    }),
+  ),
+});
+
 // ── Guard helper ─────────────────────────────────────────────────────────────
 
 async function ensureReady(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
@@ -122,6 +137,7 @@ export function registerTools(pi: ExtensionAPI): void {
   registerFocusTool(pi);
   registerFieldsTool(pi);
   registerPathTool(pi);
+  registerPlanTool(pi);
 }
 
 function registerBuildTool(pi: ExtensionAPI): void {
@@ -590,6 +606,62 @@ function registerPathTool(pi: ExtensionAPI): void {
     renderResult(result, { isPartial }, theme) {
       if (isPartial) return new Text(theme.fg("warning", "Finding path..."), 0, 0);
       return new Text(theme.fg("success", "✓ Path found"), 0, 0);
+    },
+  });
+}
+
+function registerPlanTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "gograph_plan",
+    label: "Gograph Plan",
+    description:
+      "Pre-edit change plan for a Go symbol. Aggregates callers, tests, blast radius, SQL/env/route exposure into a single checklist before modifying code. " +
+      "Use with withContext=true to bundle full context for every inspect_first symbol in one call.",
+    promptSnippet: "Plan changes for a Go symbol before editing",
+    promptGuidelines: [
+      "Use gograph_plan BEFORE editing a Go symbol to understand what will be affected.",
+      "Use gograph_plan with uncommitted=true to plan for all uncommitted changes at once.",
+      "Use gograph_plan with withContext=true to get full context for all inspect_first symbols without follow-up calls.",
+    ],
+    parameters: PlanParams,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      await ensureReady(pi, ctx);
+      const args: string[] = ["plan"];
+      if (params.uncommitted) {
+        args.push("--uncommitted");
+      } else if (params.symbol) {
+        args.push(params.symbol);
+      } else {
+        throw new Error("Provide either a symbol name or set uncommitted=true.");
+      }
+      if (params.withContext) args.push("--with-context");
+      args.push("--json");
+      const output = await runGograph(args, signal);
+      const { text, truncated, totalLines } = formatOutput(output);
+      return {
+        content: [{ type: "text", text }],
+        details: { symbol: params.symbol, uncommitted: params.uncommitted ?? false, withContext: params.withContext ?? false, truncated, totalLines },
+      };
+    },
+    renderCall(args, theme) {
+      let text = theme.fg("toolTitle", theme.bold("gograph_plan "));
+      if (args.uncommitted) {
+        text += theme.fg("accent", "--uncommitted");
+      } else {
+        text += theme.fg("accent", `"${args.symbol}"`);
+      }
+      if (args.withContext) text += theme.fg("accent", " --with-context");
+      return new Text(text, 0, 0);
+    },
+    renderResult(result, { isPartial, expanded }, theme) {
+      if (isPartial) return new Text(theme.fg("warning", "Planning..."), 0, 0);
+      const details = result.details as { truncated?: boolean } | undefined;
+      let text = theme.fg("success", "✓ Plan ready");
+      if (details?.truncated) text += theme.fg("warning", " (truncated)");
+      if (expanded && result.content[0]?.type === "text") {
+        text += "\n" + theme.fg("dim", result.content[0].text.slice(0, 3000));
+      }
+      return new Text(text, 0, 0);
     },
   });
 }
