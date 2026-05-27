@@ -137,6 +137,27 @@ const ChangesParams = Type.Object({
 
 const StatsParams = Type.Object({});
 
+const DependentsParams = Type.Object({
+  package: Type.String({ description: "Package name, path suffix, or full import path." }),
+  filesOnly: Type.Optional(
+    Type.Boolean({ description: "Return only file paths. Default: false." }),
+  ),
+});
+
+const UsagesParams = Type.Object({
+  type: Type.String({ description: "Type name to search usages for." }),
+  filesOnly: Type.Optional(
+    Type.Boolean({ description: "Return only file paths. Default: false." }),
+  ),
+});
+
+const LiteralsParams = Type.Object({
+  struct: Type.String({ description: "Struct name to find composite-literal initialization sites for." }),
+  filesOnly: Type.Optional(
+    Type.Boolean({ description: "Return only file paths. Default: false." }),
+  ),
+});
+
 // ── Guard helper ─────────────────────────────────────────────────────────────
 
 async function ensureReady(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
@@ -179,6 +200,9 @@ export function registerTools(pi: ExtensionAPI): void {
   registerErrorFlowTool(pi);
   registerChangesTool(pi);
   registerStatsTool(pi);
+  registerDependentsTool(pi);
+  registerUsagesTool(pi);
+  registerLiteralsTool(pi);
 }
 
 function registerBuildTool(pi: ExtensionAPI): void {
@@ -952,6 +976,111 @@ function registerStatsTool(pi: ExtensionAPI): void {
         return new Text(theme.fg("dim", result.content[0].text.slice(0, 3000)), 0, 0);
       }
       return new Text(theme.fg("success", "✓ Stats retrieved"), 0, 0);
+    },
+  });
+}
+
+function registerDependentsTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "gograph_dependents",
+    label: "Gograph Dependents",
+    description:
+      "Find all packages that import a given package — the inverse of deps. Accepts short name, path suffix, or full import path.",
+    promptSnippet: "Find packages that import a Go package",
+    promptGuidelines: [
+      "Use gograph_dependents to understand the blast radius of changing a Go package's API.",
+    ],
+    parameters: DependentsParams,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      await ensureReady(pi, ctx);
+      const args: string[] = ["dependents", params.package];
+      if (params.filesOnly) args.push("--files-only");
+      args.push("--json");
+      const output = await runGograph(args, signal);
+      const { text, truncated, totalLines } = formatOutput(output);
+      return {
+        content: [{ type: "text", text }],
+        details: { package: params.package, filesOnly: params.filesOnly ?? false, truncated, totalLines },
+      };
+    },
+    renderCall(args, theme) {
+      let text = theme.fg("toolTitle", theme.bold("gograph_dependents "));
+      text += theme.fg("accent", `"${args.package}"`);
+      return new Text(text, 0, 0);
+    },
+    renderResult(result, { isPartial }, theme) {
+      if (isPartial) return new Text(theme.fg("warning", "Searching dependents..."), 0, 0);
+      return new Text(theme.fg("success", "✓ Dependents found"), 0, 0);
+    },
+  });
+}
+
+function registerUsagesTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "gograph_usages",
+    label: "Gograph Usages",
+    description:
+      "Find every place a named type is referenced in function signatures, struct fields, and interface methods. Shows the true blast radius of a type change.",
+    promptSnippet: "Find all usages of a Go type",
+    promptGuidelines: [
+      "Use gograph_usages before changing a Go type to see all references across the codebase.",
+    ],
+    parameters: UsagesParams,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      await ensureReady(pi, ctx);
+      const args: string[] = ["usages", params.type];
+      if (params.filesOnly) args.push("--files-only");
+      args.push("--json");
+      const output = await runGograph(args, signal);
+      const { text, truncated, totalLines } = formatOutput(output);
+      return {
+        content: [{ type: "text", text }],
+        details: { type: params.type, filesOnly: params.filesOnly ?? false, truncated, totalLines },
+      };
+    },
+    renderCall(args, theme) {
+      let text = theme.fg("toolTitle", theme.bold("gograph_usages "));
+      text += theme.fg("accent", `"${args.type}"`);
+      return new Text(text, 0, 0);
+    },
+    renderResult(result, { isPartial }, theme) {
+      if (isPartial) return new Text(theme.fg("warning", "Searching usages..."), 0, 0);
+      return new Text(theme.fg("success", "✓ Usages found"), 0, 0);
+    },
+  });
+}
+
+function registerLiteralsTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "gograph_literals",
+    label: "Gograph Literals",
+    description:
+      "Find every composite-literal initialization site for a struct (Foo{Field: val}). Catches initialization sites that constructors miss.",
+    promptSnippet: "Find all struct literal initialization sites",
+    promptGuidelines: [
+      "Use gograph_literals before adding a required field to a struct to find all initialization sites.",
+    ],
+    parameters: LiteralsParams,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      await ensureReady(pi, ctx);
+      const args: string[] = ["literals", params.struct];
+      if (params.filesOnly) args.push("--files-only");
+      args.push("--json");
+      const output = await runGograph(args, signal);
+      const { text, truncated, totalLines } = formatOutput(output);
+      return {
+        content: [{ type: "text", text }],
+        details: { struct: params.struct, filesOnly: params.filesOnly ?? false, truncated, totalLines },
+      };
+    },
+    renderCall(args, theme) {
+      let text = theme.fg("toolTitle", theme.bold("gograph_literals "));
+      text += theme.fg("accent", `"${args.struct}"`);
+      return new Text(text, 0, 0);
+    },
+    renderResult(result, { isPartial }, theme) {
+      if (isPartial) return new Text(theme.fg("warning", "Searching literals..."), 0, 0);
+      return new Text(theme.fg("success", "✓ Literals found"), 0, 0);
     },
   });
 }
