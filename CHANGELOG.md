@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.8
+
+### Changed
+
+- `/gograph-setup` now offers to upgrade gograph when it is already installed (instead of exiting)
+- `/gograph-status` now shows the installed gograph version (e.g. `gograph: ready ✓ (gograph 0.3.1)`)
+
 ## 0.1.7
 
 ### Added

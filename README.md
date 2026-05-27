@@ -43,7 +43,7 @@ The extension activates automatically in Go projects (detected by `go.mod` or `*
 
 - `📦 gograph: run /gograph-setup` — gograph not installed
 - `gograph: run /gograph-build` — installed but no index
-- `gograph ✓` — ready
+- `gograph ✓ (gograph 0.3.1)` — ready (version shown when available)
 - `gograph: rebuilding index in background...` — a branch/HEAD change was detected and a refresh is running without blocking other work
 
 ### First time setup
@@ -57,6 +57,8 @@ If gograph is not installed:
 This will:
 1. Try to install gograph via Homebrew, falling back to `go install` if brew fails
 2. Build the initial index
+
+If gograph is already installed, `/gograph-setup` will offer to upgrade to the latest version.
 
 ### Rebuild index
 
