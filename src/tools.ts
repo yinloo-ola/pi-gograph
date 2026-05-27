@@ -23,6 +23,9 @@ const BuildParams = Type.Object({
 
 const QueryParams = Type.Object({
   query: Type.String({ description: "Symbol, file, or package name to search for" }),
+  filesOnly: Type.Optional(
+    Type.Boolean({ description: "Return only file paths. Default: false." }),
+  ),
 });
 
 const ContextParams = Type.Object({
@@ -45,6 +48,9 @@ const ImpactParams = Type.Object({
       description: "Calculate blast radius of all uncommitted code changes. Default: false.",
     }),
   ),
+  filesOnly: Type.Optional(
+    Type.Boolean({ description: "Return only file paths. Default: false." }),
+  ),
 });
 
 const SourceParams = Type.Object({
@@ -53,10 +59,22 @@ const SourceParams = Type.Object({
 
 const CallersParams = Type.Object({
   symbol: Type.String({ description: "Function or method name" }),
+  depth: Type.Optional(
+    Type.Number({ description: "BFS depth (1–10). Default: 1 (direct callers only).", minimum: 1, maximum: 10 }),
+  ),
+  filesOnly: Type.Optional(
+    Type.Boolean({ description: "Return only file paths. Default: false." }),
+  ),
 });
 
 const CalleesParams = Type.Object({
   symbol: Type.String({ description: "Function or method name" }),
+  depth: Type.Optional(
+    Type.Number({ description: "BFS depth (1–10). Default: 1 (direct callees only).", minimum: 1, maximum: 10 }),
+  ),
+  filesOnly: Type.Optional(
+    Type.Boolean({ description: "Return only file paths. Default: false." }),
+  ),
 });
 
 const EndpointParams = Type.Object({
@@ -267,11 +285,13 @@ function registerQueryTool(pi: ExtensionAPI): void {
     parameters: QueryParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       await ensureReady(pi, ctx);
-      const output = await runGograph(["query", params.query, "--json"], signal);
+      const args: string[] = ["query", params.query, "--json"];
+      if (params.filesOnly) args.push("--files-only");
+      const output = await runGograph(args, signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
         content: [{ type: "text", text }],
-        details: { query: params.query, truncated, totalLines },
+        details: { query: params.query, filesOnly: params.filesOnly ?? false, truncated, totalLines },
       };
     },
     renderCall(args, theme) {
@@ -386,6 +406,7 @@ function registerImpactTool(pi: ExtensionAPI): void {
       } else {
         throw new Error("Provide either a symbol name or set uncommitted=true.");
       }
+      if (params.filesOnly) args.push("--files-only");
       const output = await runGograph(args, signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
@@ -462,16 +483,21 @@ function registerCallersTool(pi: ExtensionAPI): void {
     parameters: CallersParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       await ensureReady(pi, ctx);
-      const output = await runGograph(["callers", params.symbol, "--json"], signal);
+      const args: string[] = ["callers", params.symbol];
+      if (params.depth && params.depth > 1) args.push("--depth", String(params.depth));
+      if (params.filesOnly) args.push("--files-only");
+      args.push("--json");
+      const output = await runGograph(args, signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
         content: [{ type: "text", text }],
-        details: { symbol: params.symbol, truncated, totalLines },
+        details: { symbol: params.symbol, depth: params.depth ?? 1, truncated, totalLines },
       };
     },
     renderCall(args, theme) {
       let text = theme.fg("toolTitle", theme.bold("gograph_callers "));
       text += theme.fg("accent", `"${args.symbol}"`);
+      if (args.depth && args.depth > 1) text += theme.fg("accent", ` --depth ${args.depth}`);
       return new Text(text, 0, 0);
     },
     renderResult(result, { isPartial }, theme) {
@@ -493,16 +519,21 @@ function registerCalleesTool(pi: ExtensionAPI): void {
     parameters: CalleesParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       await ensureReady(pi, ctx);
-      const output = await runGograph(["callees", params.symbol, "--json"], signal);
+      const args: string[] = ["callees", params.symbol];
+      if (params.depth && params.depth > 1) args.push("--depth", String(params.depth));
+      if (params.filesOnly) args.push("--files-only");
+      args.push("--json");
+      const output = await runGograph(args, signal);
       const { text, truncated, totalLines } = formatOutput(output);
       return {
         content: [{ type: "text", text }],
-        details: { symbol: params.symbol, truncated, totalLines },
+        details: { symbol: params.symbol, depth: params.depth ?? 1, truncated, totalLines },
       };
     },
     renderCall(args, theme) {
       let text = theme.fg("toolTitle", theme.bold("gograph_callees "));
       text += theme.fg("accent", `"${args.symbol}"`);
+      if (args.depth && args.depth > 1) text += theme.fg("accent", ` --depth ${args.depth}`);
       return new Text(text, 0, 0);
     },
     renderResult(result, { isPartial }, theme) {
