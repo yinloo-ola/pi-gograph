@@ -28,32 +28,43 @@ export function registerCommands(pi: ExtensionAPI): void {
 
 function registerSetupCommand(pi: ExtensionAPI): void {
   pi.registerCommand("gograph-setup", {
-    description: "Install gograph and build the initial index",
+    description: "Install or upgrade gograph and build the initial index",
     handler: async (_args, commandCtx) => {
-      if (await isGographInstalled()) {
-        commandCtx.ui.notify(
-          "gograph is already installed. Use /gograph-build to rebuild the index.",
-          "info",
-        );
-        return;
-      }
-
       let useBrew = false;
-      try {
-        const { code } = await pi.exec("brew", ["--version"], { timeout: 5000 });
-        useBrew = code === 0;
-      } catch {
-        // brew not available
-      }
 
-      const confirmed = await commandCtx.ui.confirm(
-        "Install gograph",
-        `Install gograph using ${useBrew ? "Homebrew" : "go install"}?`,
-      );
+      if (await isGographInstalled()) {
+        const version = getGographVersion();
+        const versionLabel = version ? ` ${version}` : "";
+        const confirmed = await commandCtx.ui.confirm(
+          "Upgrade gograph",
+          `gograph${versionLabel} is installed. Upgrade to latest?`,
+        );
+        if (!confirmed) return;
 
-      if (!confirmed) {
-        commandCtx.ui.notify("Installation cancelled.", "warning");
-        return;
+        // Determine install method for upgrade
+        try {
+          const { code } = await pi.exec("brew", ["--version"], { timeout: 5000 });
+          useBrew = code === 0;
+        } catch {
+          // brew not available
+        }
+      } else {
+        try {
+          const { code } = await pi.exec("brew", ["--version"], { timeout: 5000 });
+          useBrew = code === 0;
+        } catch {
+          // brew not available
+        }
+
+        const confirmed = await commandCtx.ui.confirm(
+          "Install gograph",
+          `Install gograph using ${useBrew ? "Homebrew" : "go install"}?`,
+        );
+
+        if (!confirmed) {
+          commandCtx.ui.notify("Installation cancelled.", "warning");
+          return;
+        }
       }
 
       commandCtx.ui.setStatus("gograph", "installing...");
