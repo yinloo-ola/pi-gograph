@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0
+
+### Added
+
+- **10 new tools:** `gograph_plan`, `gograph_explain`, `gograph_review`, `gograph_returnusage`, `gograph_errorflow`, `gograph_changes`, `gograph_stats`, `gograph_dependents`, `gograph_usages`, `gograph_literals`
+- **`gograph_callers`** and **`gograph_callees`** now support `--depth N` for multi-hop traversal
+- **`gograph_context`** now supports `--uncommitted` for all modified symbols
+- **`gograph_impact`** now supports `--since <ref>` and `--files-only`
+- **`gograph_implementers`** now supports `--test-only` for mock/test implementations
+- **`gograph_query`** now supports `--files-only`
+- System prompt strengthened with explicit routing rules for plan/review/explain
+
 ## 0.1.8
 
 ### Changed

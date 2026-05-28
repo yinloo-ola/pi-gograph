@@ -12,6 +12,9 @@
 Gograph builds a compact graph of your Go project's packages, symbols, calls, routes, and tests. This extension exposes gograph's capabilities as native pi tools, so the LLM can navigate your Go codebase with fewer raw file reads and better accuracy.
 
 **Key benefits:**
+- `gograph_plan` — pre-edit safety check in ONE call (replaces 5-8 separate tool calls)
+- `gograph_review` — post-edit review in ONE call
+- `gograph_explain` — architectural narrative in ONE call
 - `gograph_context` replaces 4-5 grep/cat calls in one shot
 - `gograph_implementers` reliably finds interface implementations
 - `gograph_impact` shows blast radius before you change a function
