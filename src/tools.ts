@@ -748,9 +748,10 @@ function registerPlanTool(pi: ExtensionAPI): void {
       "Use with withContext=true to bundle full context for every inspect_first symbol in one call.",
     promptSnippet: "Plan changes for a Go symbol before editing",
     promptGuidelines: [
-      "Use gograph_plan BEFORE editing a Go symbol to understand what will be affected.",
+      "Use gograph_plan BEFORE editing a Go symbol to understand what will be affected. This ONE call replaces gograph_context + gograph_impact + gograph_source + gograph_fields + gograph_callers called separately.",
       "Use gograph_plan with uncommitted=true to plan for all uncommitted changes at once.",
       "Use gograph_plan with withContext=true to get full context for all inspect_first symbols without follow-up calls.",
+      "When the user says 'plan', 'prepare', 'before editing', or 'what will be affected' → use gograph_plan, not a sequence of other gograph tools.",
     ],
     parameters: PlanParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
@@ -803,7 +804,8 @@ function registerExplainTool(pi: ExtensionAPI): void {
       "Get an LLM-ready architectural narrative for a Go symbol in ONE call. Synthesizes callers, callees, complexity, SQL, routes, tests, and role classification. Collapses 6-8 separate tool calls into one.",
     promptSnippet: "Get architectural narrative for a Go symbol",
     promptGuidelines: [
-      "Use gograph_explain when you need a comprehensive understanding of a Go symbol's role and relationships.",
+      "Use gograph_explain when you need a comprehensive understanding of a Go symbol's role and relationships. This ONE call replaces gograph_context + gograph_callers + gograph_callees + gograph_fields called separately.",
+      "When the user says 'explain', 'understand', 'what does X do', or 'tell me about' → use gograph_explain, not a sequence of other gograph tools.",
     ],
     parameters: ExplainParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
@@ -841,8 +843,9 @@ function registerReviewTool(pi: ExtensionAPI): void {
       "Post-edit review for a Go symbol or uncommitted changes. Checks: are all callers tested, did complexity increase, were new SQL or env reads introduced, were any interfaces broken. Run after editing, before committing.",
     promptSnippet: "Review Go code changes for issues",
     promptGuidelines: [
-      "Use gograph_review AFTER editing Go code to verify nothing is broken before committing.",
+      "Use gograph_review AFTER editing Go code to verify nothing is broken before committing. This ONE call replaces gograph_impact + gograph_context + gograph_callers called separately to check for regressions.",
       "Use gograph_review with uncommitted=true to review all uncommitted changes at once.",
+      "When the user says 'review', 'verify', 'check my changes', or 'did I break anything' → use gograph_review, not a sequence of other gograph tools.",
     ],
     parameters: ReviewParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
