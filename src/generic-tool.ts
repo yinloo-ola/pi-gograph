@@ -65,7 +65,7 @@ const GographParams = Type.Object({
 
 // ── Arg builder (exported for testing) ──────────────────────────────────────
 
-export interface GenericInput {
+interface GenericInput {
   subcommand: Subcommand;
   target: string;
   from?: string;
