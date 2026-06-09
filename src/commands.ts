@@ -107,7 +107,11 @@ function registerSetupCommand(pi: ExtensionAPI): void {
       commandCtx.ui.notify("Building index...", "info");
 
       try {
-        await runGographBuild(["build", "."], undefined, 60_000);
+        const buildResult = await runGographBuild(["build", "."], undefined, 60_000);
+        if (buildResult === "(build already in progress)") {
+          commandCtx.ui.notify("Build already in progress — skipping.", "warning");
+          return;
+        }
         await saveIndexState(pi, commandCtx.cwd);
 
         commandCtx.ui.notify("Index built successfully!", "info");
@@ -179,7 +183,11 @@ function registerBuildCommand(pi: ExtensionAPI): void {
       );
 
       try {
-        await runGographBuild(cmdArgs, undefined, 60_000);
+        const buildResult = await runGographBuild(cmdArgs, undefined, 60_000);
+        if (buildResult === "(build already in progress)") {
+          commandCtx.ui.notify("Build already in progress — skipping.", "warning");
+          return;
+        }
         await saveIndexState(pi, commandCtx.cwd);
 
         commandCtx.ui.notify("gograph index built successfully!", "info");
