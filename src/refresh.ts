@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { hasIndex, isGographInstalled } from "./detect.js";
-import { runGograph } from "./runner.js";
+import { runGographBuild } from "./runner.js";
 
 export interface IndexState {
   head: string;
@@ -119,7 +119,7 @@ export function scheduleBackgroundRefresh(pi: ExecApi, cwd: string, ui: StatusUi
       backgroundStatus = "gograph: rebuilding index in background...";
       ui.setStatus("gograph", backgroundStatus);
 
-      await runGograph(["build", "."], undefined, 60_000);
+      await runGographBuild(["build", "."], undefined, 60_000);
       await writeIndexState(cwd, current);
 
       lastBackgroundHead = current.head;

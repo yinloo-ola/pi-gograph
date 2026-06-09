@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { hasIndex as hasGographIndex, isGographInstalled, getGographVersion } from "./detect.js";
-import { runGograph } from "./runner.js";
+import { runGographBuild } from "./runner.js";
 import {
   clearBackgroundStatus,
   getBackgroundStatus,
@@ -107,7 +107,7 @@ function registerSetupCommand(pi: ExtensionAPI): void {
       commandCtx.ui.notify("Building index...", "info");
 
       try {
-        await runGograph(["build", "."], undefined, 60_000);
+        await runGographBuild(["build", "."], undefined, 60_000);
         await saveIndexState(pi, commandCtx.cwd);
 
         commandCtx.ui.notify("Index built successfully!", "info");
@@ -182,7 +182,7 @@ function registerBuildCommand(pi: ExtensionAPI): void {
       );
 
       try {
-        await runGograph(cmdArgs, undefined, 60_000);
+        await runGographBuild(cmdArgs, undefined, 60_000);
         await saveIndexState(pi, commandCtx.cwd);
 
         commandCtx.ui.notify("gograph index built successfully!", "info");
