@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.0
+
+### Changed
+
+- **Tool reduction: 23 tools → 9 tools.** 8 primary tools (build, query, context, implementers, endpoint, plan, explain, review) + 1 generic `gograph` dispatcher for 15 subcommands (callers, callees, source, fields, impact, path, returnusage, errorflow, changes, check, focus, stats, dependents, usages, literals)
+- `gograph` generic tool supports typed parameters (`depth`, `filesOnly`, `uncommitted`) and a `flags` string fallback for rare flags (`--git`, `--since`, `--test-only`, etc.)
+- System prompt now includes explicit "NEVER" anti-patterns to prevent the LLM from chaining low-level tools when aggregation tools (plan, review, explain) would suffice
+- `gograph_build` now uses an in-memory lock to prevent concurrent builds
+- Background refresh no longer overwrites status when a build is already in progress
+
+### Fixed
+
+- `gograph_build` now correctly shows "not installed" error when gograph is missing (previously fell through to a raw CLI error)
+- Background refresh and slash commands now check for concurrent builds before writing index state
+- Error message for "gograph not installed" is now consistent across all entry points
+
+### Removed
+
+- 14 individual tool registrations removed (callers, callees, source, fields, impact, path, returnusage, errorflow, changes, check, focus, stats, dependents, usages, literals) — available via the generic `gograph` tool instead
+
 ## 0.2.0
 
 ### Added

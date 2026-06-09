@@ -1,6 +1,6 @@
 {
   "name": "pi-gograph",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Gograph integration for pi \u2014 AST-aware Go code navigation",
   "type": "module",
   "license": "MIT",

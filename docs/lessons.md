@@ -2,22 +2,32 @@
 
 <!--
 Agent: read this at the start of each task during executing-tasks.
-Follow every rule. Add new rules when you catch yourself making repeat mistakes.
+Follow every rule. Add new rules when you catch yourself during repeat mistakes.
 Retire rules that no longer apply during finalizing.
 -->
 
 ## Rules
 
 - pi's internal packages (`@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, `typebox`) must be added as devDependencies for local TypeScript compilation and testing
-- Use `pi.exec()` (not `execSync`) for actual gograph CLI calls in the runner — `execSync` is only acceptable for quick availability checks like `isGographInstalled()`
 - Always run `npx tsc --noEmit` after adding new imports to catch missing type declarations early
-- When vitest shows `PASS (0) FAIL (0)`, the test file likely has import errors — check if dependencies are installed locally
+
+## Dependencies & Execution
+
+- Use `pi.exec()` (not `execSync`) for actual CLI calls in the runner — `execSync` is only acceptable for quick availability checks (e.g., `which gograph`, `gograph --version`)
+- Provide sync and async wrappers when a check function is needed in both sync callbacks (e.g., `buildArgs`) and async contexts — the async wrapper should delegate to the sync one to avoid duplication
 
 ## Testing
 
 - When verifying extension changes work in a real project, ensure the local extension path is the **only** source — a global `npm:<package>` in `~/.pi/agent/settings.json` will shadow the local path and load the published version instead
+- When vitest shows `PASS (0) FAIL (0)`, the test file likely has import errors — check if dependencies are installed locally
 
 ## Prompting
 
 - Aggregation tools (plan, review, explain) need explicit routing in both the system prompt AND promptGuidelines — a passive tool list is not enough to prevent the agent from falling back to calling individual tools separately
 - In promptGuidelines, always name the tool explicitly ("Use gograph_plan when..."), never use "this tool" — the LLM cannot tell which tool "this" refers to
+
+## Code Review
+
+- When calling async functions from synchronous contexts, verify the return type — `!Promise<boolean>` is always `false` because Promises are truthy. TypeScript won't catch this if the sync callback's return type doesn't use `await`.
+- Error messages used in multiple places should be extracted to a shared constant or factory — duplicated messages diverge over time and one location gets missed during updates
+- When adding a guard pattern (e.g., checking return values) in one file, grep for the same pattern in all files — partial fixes are easy to miss
