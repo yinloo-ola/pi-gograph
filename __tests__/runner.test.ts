@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatOutput, runGographBuild } from "../src/runner.js";
+import { formatOutput } from "../src/runner.js";
 
 describe("formatOutput", () => {
   it("returns (no results) for empty string", () => {
@@ -33,12 +33,6 @@ describe("formatOutput", () => {
     expect(result.text).toContain("[Output truncated:");
     expect(result.text).toContain("2000 of 2500 lines");
   });
-
-describe("runGographBuild", () => {
-  it("exports a function", () => {
-    expect(typeof runGographBuild).toBe("function");
-  });
-});
 
   it("preserves truncation notice format", () => {
     const lines = Array.from({ length: 3000 }, (_, i) => `line ${i}`);
