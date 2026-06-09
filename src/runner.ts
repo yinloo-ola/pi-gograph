@@ -51,6 +51,27 @@ export async function runGograph(
   return result.stdout;
 }
 
+/** In-memory lock to prevent concurrent gograph build processes. */
+let buildInProgress = false;
+
+/**
+ * Run a gograph build command with a lock to prevent concurrent builds.
+ * Returns a message if a build is already in progress.
+ */
+export async function runGographBuild(
+  args: string[],
+  signal?: AbortSignal,
+  timeout = 60_000,
+): Promise<string> {
+  if (buildInProgress) return "(build already in progress)";
+  buildInProgress = true;
+  try {
+    return await runGograph(args, signal, timeout);
+  } finally {
+    buildInProgress = false;
+  }
+}
+
 /**
  * Format gograph CLI output for the LLM.
  * Applies truncation and returns metadata.
