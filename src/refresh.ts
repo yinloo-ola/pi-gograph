@@ -119,7 +119,11 @@ export function scheduleBackgroundRefresh(pi: ExecApi, cwd: string, ui: StatusUi
       backgroundStatus = "gograph: rebuilding index in background...";
       ui.setStatus("gograph", backgroundStatus);
 
-      await runGographBuild(["build", "."], undefined, 60_000);
+      const buildResult = await runGographBuild(["build", "."], undefined, 60_000);
+      if (buildResult === "(build already in progress)") {
+        // Another build (e.g. tool-triggered) is already running — don't overwrite its status
+        return;
+      }
       await writeIndexState(cwd, current);
 
       lastBackgroundHead = current.head;
