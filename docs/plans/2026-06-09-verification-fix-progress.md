@@ -11,4 +11,4 @@ Last updated: 2026-06-09T00:00:00.000Z
 | 2 | ✅ done | Fix `gograph_build` missing "not installed" error | cce02c5 |
 | 3 | ✅ done | Fix background refresh treating "already in progress" as success | a8fc4bb |
 | 4 | ✅ done | Remove useless `runGographBuild` stub test | fa3d3f4 |
-| 5 | 🔄 in-progress | TypeScript check and full test suite (checkpoint: done) | — |
+| 5 | ✅ done | TypeScript check and full test suite (checkpoint: done) | 141c916 |
