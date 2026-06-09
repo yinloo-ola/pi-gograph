@@ -162,12 +162,12 @@ Used by `gograph_build` tool, `/gograph-build` command, and background refresh.
 
 | # | Feature | Status | Observable Behavior |
 |---|---------|--------|---------------------|
-| 1 | Generic `gograph` tool with 15 subcommands | ⬜ pending | LLM can call `gograph(subcommand="callers", target="...")` instead of individual tool |
-| 2 | 8 primary tools unchanged | ⬜ pending | gograph_plan, review, explain, context, query, implementers, endpoint, build work as before |
-| 3 | New system prompt with anti-pattern rules | ⬜ pending | LLM uses plan/review/explain instead of chaining context+callers+grep |
-| 4 | registerSimpleTool helper | ⬜ pending | tools.ts ~350 lines, each tool ~15 lines of unique code |
-| 5 | Build lock prevents concurrent builds | ⬜ pending | No two `gograph build` processes run simultaneously |
-| 6 | Generic tool validates subcommand-specific requirements | ⬜ pending | `gograph(subcommand="path", target="X")` without `from` returns clear error |
-| 7 | Generic tool filters irrelevant flags per subcommand | ⬜ pending | `gograph(subcommand="stats", depth=3)` does not pass `--depth` to CLI |
+| 1 | Generic `gograph` tool with 15 subcommands | ✅ done | LLM can call `gograph(subcommand="callers", target="...")` instead of individual tool |
+| 2 | 8 primary tools unchanged | ✅ done | gograph_plan, review, explain, context, query, implementers, endpoint, build work as before |
+| 3 | New system prompt with anti-pattern rules | ✅ done | LLM uses plan/review/explain instead of chaining context+callers+grep |
+| 4 | registerSimpleTool helper | ✅ done | tools.ts ~350 lines, each tool ~15 lines of unique code |
+| 5 | Build lock prevents concurrent builds | ✅ done | No two `gograph build` processes run simultaneously |
+| 6 | Generic tool validates subcommand-specific requirements | ✅ done | `gograph(subcommand="path", target="X")` without `from` returns clear error |
+| 7 | Generic tool filters irrelevant flags per subcommand | ✅ done | `gograph(subcommand="stats", depth=3)` does not pass `--depth` to CLI |
 
 No production-risk review needed — no database schema changes, authentication, external APIs, or concurrency beyond the build lock.
