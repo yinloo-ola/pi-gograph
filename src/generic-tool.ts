@@ -11,7 +11,7 @@ const SUBCOMMANDS = [
   "dependents", "usages", "literals",
 ] as const;
 
-export type Subcommand = (typeof SUBCOMMANDS)[number];
+type Subcommand = (typeof SUBCOMMANDS)[number];
 
 const SubcommandLiteral = SUBCOMMANDS.map((s) => Type.Literal(s));
 
