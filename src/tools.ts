@@ -1,9 +1,7 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, TSchema } from "typebox";
 import { Text } from "@earendil-works/pi-tui";
-import { isGographInstalled, hasIndex } from "./detect.js";
-import { runGograph, runGographBuild, formatOutput } from "./runner.js";
-import { scheduleBackgroundRefresh } from "./refresh.js";
+import { runGograph, runGographBuild, formatOutput, ensureReady } from "./runner.js";
 
 // ── Parameter schemas ────────────────────────────────────────────────────────
 
@@ -78,25 +76,6 @@ const ReviewParams = Type.Object({
     Type.Boolean({ description: "Review all uncommitted changes. Default: false." }),
   ),
 });
-
-// ── Guard helper ─────────────────────────────────────────────────────────────
-
-async function ensureReady(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
-  scheduleBackgroundRefresh(pi, ctx.cwd, ctx.ui);
-
-  if (!(await isGographInstalled())) {
-    throw new Error(
-      "gograph is not installed. Run `/gograph-setup` or install manually:\n" +
-      "  brew install ozgurcd/tap/gograph\n" +
-      "  go install github.com/ozgurcd/gograph/cmd/gograph@latest",
-    );
-  }
-  if (!(await hasIndex(ctx.cwd))) {
-    throw new Error(
-      "No gograph index found. Run `gograph build .` or use the gograph_build tool.",
-    );
-  }
-}
 
 // ── registerSimpleTool helper ───────────────────────────────────────────────
 

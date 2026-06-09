@@ -1,9 +1,7 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Text } from "@earendil-works/pi-tui";
-import { isGographInstalled, hasIndex } from "./detect.js";
-import { runGograph, formatOutput } from "./runner.js";
-import { scheduleBackgroundRefresh } from "./refresh.js";
+import { runGograph, formatOutput, ensureReady } from "./runner.js";
 
 // ── Subcommand definitions ────────────────────────────────────────────────────
 
@@ -115,25 +113,6 @@ export function buildGenericArgs(params: GenericInput): string[] {
 
   args.push("--json");
   return args;
-}
-
-// ── Guard helper ────────────────────────────────────────────────────────────
-
-async function ensureReady(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
-  scheduleBackgroundRefresh(pi, ctx.cwd, ctx.ui);
-
-  if (!(await isGographInstalled())) {
-    throw new Error(
-      "gograph is not installed. Run `/gograph-setup` or install manually:\n" +
-      "  brew install ozgurcd/tap/gograph\n" +
-      "  go install github.com/ozgurcd/gograph/cmd/gograph@latest",
-    );
-  }
-  if (!(await hasIndex(ctx.cwd))) {
-    throw new Error(
-      "No gograph index found. Run `gograph build .` or use the gograph_build tool.",
-    );
-  }
 }
 
 // ── Tool registration ────────────────────────────────────────────────────────

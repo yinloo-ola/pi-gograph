@@ -4,6 +4,8 @@ import {
   formatSize,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
+import { isGographInstalled, hasIndex } from "./detect.js";
+import { scheduleBackgroundRefresh } from "./refresh.js";
 
 /** ExtensionAPI exec function type */
 type ExecFn = (
@@ -69,6 +71,32 @@ export async function runGographBuild(
     return await runGograph(args, signal, timeout);
   } finally {
     buildInProgress = false;
+  }
+}
+
+/**
+ * Check that gograph is installed and the project has an index.
+ * Schedules a background refresh as a side effect.
+ * Throws a helpful error message if prerequisites are not met.
+ */
+export async function ensureReady(
+  pi: { exec: ExecFn },
+  ctx: { cwd: string; ui: { setStatus: (key: string, value: string | undefined) => void } },
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  scheduleBackgroundRefresh(pi as any, ctx.cwd, ctx.ui);
+
+  if (!(await isGographInstalled())) {
+    throw new Error(
+      "gograph is not installed. Run `/gograph-setup` or install manually:\n" +
+      "  brew install ozgurcd/tap/gograph\n" +
+      "  go install github.com/ozgurcd/gograph/cmd/gograph@latest",
+    );
+  }
+  if (!(await hasIndex(ctx.cwd))) {
+    throw new Error(
+      "No gograph index found. Run `gograph build .` or use the gograph_build tool.",
+    );
   }
 }
 
