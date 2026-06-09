@@ -7,8 +7,8 @@ Last updated: 2026-06-09T00:00:00.000Z
 
 | # | Status | Task | Commit |
 |---|--------|------|--------|
-| 1 | ⬜ pending | Extract shared `ensureReady` to runner.ts | — |
-| 2 | ⬜ pending | Fix `gograph_build` missing "not installed" error | — |
-| 3 | ⬜ pending | Fix background refresh treating "already in progress" as success | — |
-| 4 | ⬜ pending | Remove useless `runGographBuild` stub test | — |
-| 5 | ⬜ pending | TypeScript check and full test suite (checkpoint: done) | — |
+| 1 | ✅ done | Extract shared `ensureReady` to runner.ts | 63c849c |
+| 2 | ✅ done | Fix `gograph_build` missing "not installed" error | cce02c5 |
+| 3 | ✅ done | Fix background refresh treating "already in progress" as success | a8fc4bb |
+| 4 | ✅ done | Remove useless `runGographBuild` stub test | fa3d3f4 |
+| 5 | 🔄 in-progress | TypeScript check and full test suite (checkpoint: done) | — |
