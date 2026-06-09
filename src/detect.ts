@@ -57,16 +57,29 @@ async function hasGoFilesRecursive(
   return false;
 }
 
+const GOGRAPH_NOT_INSTALLED_MSG =
+  "gograph is not installed. Run `/gograph-setup` or install manually:\n" +
+  "  brew install ozgurcd/tap/gograph\n" +
+  "  go install github.com/ozgurcd/gograph/cmd/gograph@latest";
+
 /**
- * Check if gograph is installed and available in PATH.
+ * Check if gograph is installed (synchronous — uses execSync).
+ * For sync contexts like tool buildArgs callbacks.
  */
-export async function isGographInstalled(): Promise<boolean> {
+export function isGographInstalledSync(): boolean {
   try {
     execSync("gograph --version", { timeout: 3000, stdio: "ignore" });
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * Check if gograph is installed and available in PATH (async).
+ */
+export async function isGographInstalled(): Promise<boolean> {
+  return isGographInstalledSync();
 }
 
 /**
@@ -80,6 +93,13 @@ export function getGographVersion(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Shared "not installed" error for consistent messaging.
+ */
+export function gographNotInstalledError(): Error {
+  return new Error(GOGRAPH_NOT_INSTALLED_MSG);
 }
 
 /**

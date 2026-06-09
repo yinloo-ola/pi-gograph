@@ -4,7 +4,7 @@ import {
   formatSize,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
-import { isGographInstalled, hasIndex } from "./detect.js";
+import { isGographInstalledSync, hasIndex, gographNotInstalledError } from "./detect.js";
 import { scheduleBackgroundRefresh } from "./refresh.js";
 
 /** ExtensionAPI exec function type */
@@ -86,12 +86,8 @@ export async function ensureReady(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   scheduleBackgroundRefresh(pi as any, ctx.cwd, ctx.ui);
 
-  if (!(await isGographInstalled())) {
-    throw new Error(
-      "gograph is not installed. Run `/gograph-setup` or install manually:\n" +
-      "  brew install ozgurcd/tap/gograph\n" +
-      "  go install github.com/ozgurcd/gograph/cmd/gograph@latest",
-    );
+  if (!isGographInstalledSync()) {
+    throw gographNotInstalledError();
   }
   if (!(await hasIndex(ctx.cwd))) {
     throw new Error(

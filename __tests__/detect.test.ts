@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { isGoRepo, hasIndex, getGographVersion } from "../src/detect.js";
+import { isGoRepo, hasIndex, getGographVersion, isGographInstalledSync, gographNotInstalledError } from "../src/detect.js";
 
 describe("isGoRepo", () => {
   let tempDir: string;
@@ -77,5 +77,26 @@ describe("getGographVersion", () => {
     if (result !== null) {
       expect(result.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("isGographInstalledSync", () => {
+  it("returns boolean (not Promise)", () => {
+    const result = isGographInstalledSync();
+    expect(typeof result).toBe("boolean");
+  });
+
+  it("matches isGographInstalled result", async () => {
+    const { isGographInstalled } = await import("../src/detect.js");
+    expect(isGographInstalledSync()).toBe(await isGographInstalled());
+  });
+});
+
+describe("gographNotInstalledError", () => {
+  it("returns an Error with setup instructions", () => {
+    const err = gographNotInstalledError();
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toContain("/gograph-setup");
+    expect(err.message).toContain("brew install");
   });
 });

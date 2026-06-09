@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, TSchema } from "typebox";
 import { Text } from "@earendil-works/pi-tui";
-import { isGographInstalled } from "./detect.js";
+import { isGographInstalledSync, gographNotInstalledError } from "./detect.js";
 import { runGograph, runGographBuild, formatOutput, ensureReady } from "./runner.js";
 
 // ── Parameter schemas ────────────────────────────────────────────────────────
@@ -171,12 +171,8 @@ function registerBuildTool(pi: ExtensionAPI): void {
     ],
     parameters: BuildParams,
     buildArgs: (p) => {
-      if (!isGographInstalled()) {
-        throw new Error(
-          "gograph is not installed. Run `/gograph-setup` or install manually:\n" +
-          "  brew install ozgurcd/tap/gograph\n" +
-          "  go install github.com/ozgurcd/gograph/cmd/gograph@latest",
-        );
+      if (!isGographInstalledSync()) {
+        throw gographNotInstalledError();
       }
       const args = ["build", "."];
       if (p.precise) args.push("--precise");

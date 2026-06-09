@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { hasIndex as hasGographIndex, isGographInstalled, getGographVersion } from "./detect.js";
+import { hasIndex as hasGographIndex, isGographInstalled, getGographVersion, gographNotInstalledError } from "./detect.js";
 import { runGographBuild } from "./runner.js";
 import {
   clearBackgroundStatus,
@@ -163,10 +163,7 @@ function registerBuildCommand(pi: ExtensionAPI): void {
     },
     handler: async (args, commandCtx) => {
       if (!(await isGographInstalled())) {
-        commandCtx.ui.notify(
-          "gograph is not installed. Run /gograph-setup first.",
-          "error",
-        );
+        commandCtx.ui.notify(gographNotInstalledError().message, "error");
         return;
       }
 
