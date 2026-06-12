@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.1
+
+### Fixed
+- `gograph_review` no longer reports stale data after edits. It now rebuilds the gograph AST index automatically before running the review, so the post-edit verification reflects the latest changes. Use the new `skipRebuild` parameter to opt out.
+
+### Changed
+- All tool descriptions and prompt guidelines rewritten to match the actual gograph CLI behavior. Removed references to non-existent tool names (`gograph_source`, `gograph_callers`, `gograph_callees`, `gograph_fields`, `gograph_impact`) that were causing the LLM to hallucinate tool invocations.
+- The `gograph` generic tool's description now lists all 13 supported subcommands with brief usage notes and example invocations.
+
+### Added
+- `SimpleToolConfig.preExecute` hook in `src/tools.ts` — a generic way to run a CLI command before the main tool command. Currently used by `gograph_review` for the implicit rebuild.
+- `gograph_review` accepts a new `skipRebuild` parameter (default: `false`) to skip the implicit index rebuild.
+
 ## 0.3.0
 
 ### Changed
