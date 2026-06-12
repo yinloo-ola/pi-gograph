@@ -122,18 +122,32 @@ export function registerGenericTool(pi: ExtensionAPI): void {
     name: "gograph",
     label: "Gograph",
     description:
-      "Generic gograph tool for advanced Go code queries. Use when primary tools (plan, review, explain, context, query, implementers, endpoint) don't cover the need.\n\n" +
-      "Subcommands: callers, callees, source, fields, impact, path, returnusage, errorflow, changes, check, focus, stats, dependents, usages, literals.\n\n" +
-      "Examples:\n" +
-      '- callers: `gograph(subcommand="callers", target="HandleUser", depth=3)`\n' +
-      '- path: `gograph(subcommand="path", target="HandleUser", from="DB.Save")`\n' +
-      '- fields: `gograph(subcommand="fields", target="UserConfig")`\n' +
-      '- stats: `gograph(subcommand="stats", target="")`',
-    promptSnippet: "Advanced Go code query (callers, callees, source, fields, impact, etc.)",
+      "Run gograph CLI subcommands for Go code queries not covered by primary tools.\n\n"
+      + "callers — find all callers of a function. Supports --depth N for transitive callers.\n"
+      + "callees — find all functions called from within a target function. Supports --depth N.\n"
+      + "source — extract exact source code for a symbol from the AST index.\n"
+      + "fields — list all fields of a struct.\n"
+      + "impact — calculate transitive downstream blast radius of a symbol. Supports --uncommitted.\n"
+      + "path — find shortest call chain (BFS) between two symbols. Requires both target and from.\n"
+      + "returnusage — trace how callers consume a function's return values (discarded, assigned, passed, etc.).\n"
+      + "errorflow — trace an error string from declaration through return/wrapping up to HTTP entry points.\n"
+      + "changes — find symbols in changed files. Use flags: \"--git main\".\n"
+      + "check — run static policy checks against package boundaries and test requirements. Supports --uncommitted.\n"
+      + "focus — get all files, symbols, internal calls, and dependencies for a package.\n"
+      + "stats — index health summary: package count, symbol count, call count, etc.\n"
+      + "dependents — find all packages that import a given package.\n"
+      + "usages — find all places a type appears in signatures and struct fields.\n"
+      + "literals — find all struct literal initialization sites.\n\n"
+      + "Examples:\n"
+      + '- callers: gograph(subcommand="callers", target="HandleUser", depth=3)\n'
+      + '- path: gograph(subcommand="path", target="HandleUser", from="DB.Save")\n'
+      + '- fields: gograph(subcommand="fields", target="UserConfig")\n'
+      + '- stats: gograph(subcommand="stats", target="")',
+    promptSnippet: "Go code queries: callers, callees, source, fields, impact, path, returnusage, errorflow, etc.",
     promptGuidelines: [
-      "Use the `gograph` generic tool for callers, callees, source, fields, impact, path, returnusage, errorflow, changes, check, focus, stats, dependents, usages, and literals.",
-      "Prefer primary tools (gograph_plan, gograph_review, gograph_explain) when they cover your need — the generic tool is for cases they don't.",
-      'For "path" subcommand, always provide both "target" and "from".',
+      "Prefer primary tools (gograph_plan, gograph_review, gograph_explain, gograph_context) when they cover your need — they aggregate multiple subcommands in one call.",
+      "Use this generic tool only when no primary tool covers the query.",
+      'For the "path" subcommand, always provide both "target" and "from".',
     ],
     parameters: GographParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {

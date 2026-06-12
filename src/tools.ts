@@ -10,7 +10,7 @@ const BuildParams = Type.Object({
   precise: Type.Optional(
     Type.Boolean({
       description:
-        "Use type-checked analysis for exact interface satisfaction and call edges (slower, requires compilable code). Default: false.",
+        "Use type-checked Class Hierarchy Analysis (CHA) to resolve interface dispatch exactly. Slower, requires compilable code. Default: false.",
     }),
   ),
 });
@@ -46,7 +46,7 @@ const ImplementersParams = Type.Object({
 const EndpointParams = Type.Object({
   target: Type.String({
     description:
-      'Handler name (preferred) or route pattern like "POST /api/users". Returns full vertical slice: handler → call chain → SQL → env reads.',
+      'Handler symbol name (preferred), route path fragment (e.g. /users), or route pattern (e.g. POST /api/users). Composes: route definition → handler → callee chain (BFS depth 5) → SQL → env reads.',
   }),
 });
 
@@ -60,7 +60,7 @@ const PlanParams = Type.Object({
   withContext: Type.Optional(
     Type.Boolean({
       description:
-        "Bundle full context (source, callers, callees, role, tests) for every inspect_first symbol. Default: false.",
+        "Inline full source/callers/callees for every symbol in the plan. Default: false.",
     }),
   ),
 });
@@ -75,6 +75,10 @@ const ReviewParams = Type.Object({
   ),
   uncommitted: Type.Optional(
     Type.Boolean({ description: "Review all uncommitted changes. Default: false." }),
+  ),
+  /** Skip the implicit index rebuild. Use only if you've already built recently. Default: false. */
+  skipRebuild: Type.Optional(
+    Type.Boolean({ description: "Skip the automatic index rebuild before reviewing. Default: false." }),
   ),
 });
 
@@ -95,6 +99,16 @@ interface SimpleToolConfig {
   useBuildLock?: boolean;
   /** Custom timeout (default: 30_000) */
   timeout?: number;
+  /**
+   * Optional hook run BEFORE the main command (after ensureReady).
+   * Use to chain dependent CLI calls — e.g. rebuild the index
+   * before reviewing. Return a short status string for the
+   * result header, or null to skip.
+   */
+  preExecute?: (
+    params: any,
+    signal: AbortSignal | undefined,
+  ) => Promise<string | null>;
   /** Render the args portion of the tool call line (after the tool name) */
   renderCallArgs: (args: any, theme: any) => any;
   /** Render expanded result preview (optional) */
@@ -116,15 +130,25 @@ function registerSimpleTool(pi: ExtensionAPI, config: SimpleToolConfig): void {
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       if (needsReady) await ensureReady(pi, ctx);
 
+      const preStatus = config.preExecute
+        ? await config.preExecute(params, signal)
+        : null;
+
       const args = config.buildArgs(params);
       const output = useBuildLock
         ? await runGographBuild(args, signal, timeout)
         : await runGograph(args, signal, timeout);
       const { text, truncated, totalLines } = formatOutput(output);
 
+      const details: { truncated?: boolean; totalLines: number; preStatus?: string } = {
+        truncated,
+        totalLines,
+      };
+      if (preStatus) details.preStatus = preStatus;
+
       return {
         content: [{ type: "text", text }],
-        details: { truncated, totalLines },
+        details,
       };
     },
     renderCall(args, theme) {
@@ -134,8 +158,9 @@ function registerSimpleTool(pi: ExtensionAPI, config: SimpleToolConfig): void {
     },
     renderResult(result, { isPartial, expanded }, theme) {
       if (isPartial) return new Text(theme.fg("warning", "Querying..."), 0, 0);
-      const details = result.details as { truncated?: boolean } | undefined;
+      const details = result.details as { truncated?: boolean; preStatus?: string } | undefined;
       let text = theme.fg("success", "✓ Done");
+      if (details?.preStatus) text += theme.fg("dim", ` (${details.preStatus})`);
       if (details?.truncated) text += theme.fg("warning", " (truncated)");
       if (expanded && result.content[0]?.type === "text" && config.renderExpanded) {
         text += "\n" + config.renderExpanded(result, theme);
@@ -163,11 +188,13 @@ function registerBuildTool(pi: ExtensionAPI): void {
     name: "gograph_build",
     label: "Gograph Build",
     description:
-      "Build or rebuild the gograph graph index for this Go project. Run this after major code changes.",
-    promptSnippet: "Build/rebuild the gograph AST index",
+      "Build or rebuild the gograph AST index. Parses the Go repository and generates the structured call graph."
+      + " Run after significant code changes so subsequent queries reflect the current code."
+      + " With precise=true, enables type-checked Class Hierarchy Analysis (CHA) to resolve interface dispatch exactly — slower but exact.",
+    promptSnippet: "Rebuild the gograph AST index",
     promptGuidelines: [
-      "Use gograph_build to rebuild the index after making significant code changes before querying gograph again.",
-      "Use gograph_build with precise=true when you need exact type-checked interface satisfaction and call edges.",
+      "Run gograph_build after significant code changes (new functions, renamed symbols, moved packages) so queries stay accurate.",
+      "Use precise=true when you need exact interface dispatch resolution — it requires the code to compile.",
     ],
     parameters: BuildParams,
     buildArgs: (p) => {
@@ -191,10 +218,11 @@ function registerQueryTool(pi: ExtensionAPI): void {
     name: "gograph_query",
     label: "Gograph Query",
     description:
-      "Search for Go symbols, files, or packages by name. Use this as a first step to discover symbols.",
+      "Case-insensitive substring search across symbol names, file paths, package names, and call sites."
+      + " Multiple terms are OR-matched. Use this to discover exact symbol names before querying with other tools.",
     promptSnippet: "Search for Go symbols by name",
     promptGuidelines: [
-      "Use gograph_query to discover symbol names when you are unsure of the exact name before using gograph_context.",
+      "Use gograph_query when you know a partial name but need the exact symbol name for other gograph tools.",
     ],
     parameters: QueryParams,
     buildArgs: (p) => {
@@ -212,11 +240,12 @@ function registerContextTool(pi: ExtensionAPI): void {
     name: "gograph_context",
     label: "Gograph Context",
     description:
-      "Get a full context bundle for a Go symbol in ONE call: source, callers, callees, and tests. Replaces 4-5 grep/cat reads.",
-    promptSnippet: "Get source + callers + callees + tests for a Go symbol",
+      "Gather all structural details for a symbol in one call: AST metadata, exact source code, caller list, callee list, test list, and architectural role classification."
+      + " With uncommitted=true, bundles context for all uncommitted modified symbols.",
+    promptSnippet: "Get full structural context for a Go symbol",
     promptGuidelines: [
-      "Use gograph_context (not grep/cat) to understand any Go symbol — it returns source, callers, callees, and tests in one call.",
-      "Use gograph_context before modifying a function to understand its relationships and downstream effects.",
+      "Use gograph_context to understand a symbol before modifying it — it returns source, callers, callees, tests, and role in one call.",
+      "Use gograph_context with uncommitted=true to get context for everything you've changed but not yet committed.",
     ],
     parameters: ContextParams,
     buildArgs: (p) => {
@@ -235,10 +264,12 @@ function registerImplementersTool(pi: ExtensionAPI): void {
     name: "gograph_implementers",
     label: "Gograph Implementers",
     description:
-      "Find all structs that implement a given Go interface.",
-    promptSnippet: "Find all structs implementing a Go interface",
+      "Find all structs that satisfy a given Go interface via duck-typing."
+      + " With testOnly=true, restricts results to structs defined in test or mock files.",
+    promptSnippet: "Find structs implementing a Go interface",
     promptGuidelines: [
-      "Use gograph_implementers (not grep) to find which structs implement a Go interface.",
+      "Use gograph_implementers to find concrete types satisfying an interface before adding or changing interface methods.",
+      "Use testOnly=true when you need to find existing test doubles for an interface.",
     ],
     parameters: ImplementersParams,
     buildArgs: (p) => {
@@ -260,7 +291,9 @@ function registerEndpointTool(pi: ExtensionAPI): void {
     name: "gograph_endpoint",
     label: "Gograph Endpoint",
     description:
-      "Get a full vertical slice for an HTTP endpoint: handler → call chain → SQL → env reads.",
+      "Generate a complete vertical slice report for an HTTP endpoint."
+      + " Composes: route definition + handler function + full downstream callee chain (BFS, default depth 5) + SQL queries + env vars read."
+      + " Accepts handler symbol name, route path fragment (e.g. /users), or route pattern (e.g. POST /api/users).",
     promptSnippet: "Get full vertical slice for an HTTP endpoint",
     promptGuidelines: [
       "Use gograph_endpoint to understand the full call chain of an HTTP handler from entry to database.",
@@ -277,10 +310,12 @@ function registerPlanTool(pi: ExtensionAPI): void {
     name: "gograph_plan",
     label: "Gograph Plan",
     description:
-      "Pre-edit change plan. Aggregates callers, tests, blast radius, SQL/env/route exposure into a single checklist. ONE call replaces gograph_context + gograph_impact + gograph_source + gograph_fields + gograph_callers.",
+      "Generate a pre-edit change-impact plan. Returns: affected callers, tests to run, blast radius, SQL writes, env reads, and route exposure."
+      + " With uncommitted=true, generates a joint plan for all uncommitted modified symbols."
+      + " With withContext=true, inlines full source/callers/callees for every symbol in the plan.",
     promptSnippet: "Plan changes for a Go symbol before editing",
     promptGuidelines: [
-      "Use gograph_plan BEFORE editing a Go symbol. This ONE call replaces gograph_context + gograph_impact + gograph_source + gograph_fields + gograph_callers called separately.",
+      "Use gograph_plan BEFORE editing a Go symbol to understand the blast radius — callers, tests, SQL writes, env reads, and route exposure in one call.",
       "Use gograph_plan with uncommitted=true to plan for all uncommitted changes at once.",
       "Use gograph_plan with withContext=true to get full context for all inspect_first symbols without follow-up calls.",
       'When the user says "plan", "prepare", "before editing", or "what will be affected" → use gograph_plan, not a sequence of other gograph tools.',
@@ -311,10 +346,11 @@ function registerExplainTool(pi: ExtensionAPI): void {
     name: "gograph_explain",
     label: "Gograph Explain",
     description:
-      "Get an LLM-ready architectural narrative for a Go symbol in ONE call. Synthesizes callers, callees, complexity, SQL, routes, tests, and role classification. Collapses 6-8 separate tool calls into one.",
+      "Synthesize AST data into a rich architectural narrative for any Go symbol."
+      + " Returns: symbol purpose, prod vs test split, McCabe cyclomatic complexity, SQL queries, env vars, matching HTTP routes, interface satisfaction, and role classification (e.g. HTTP handler, orchestrator, utility).",
     promptSnippet: "Get architectural narrative for a Go symbol",
     promptGuidelines: [
-      "Use gograph_explain when you need a comprehensive understanding of a Go symbol's role and relationships. This ONE call replaces gograph_context + gograph_callers + gograph_callees + gograph_fields called separately.",
+      "Use gograph_explain when you need a comprehensive understanding of a Go symbol — purpose, complexity, callers, callees, SQL, routes, and role classification in one call.",
       'When the user says "explain", "understand", "what does X do", or "tell me about" → use gograph_explain, not a sequence of other gograph tools.',
     ],
     parameters: ExplainParams,
@@ -329,10 +365,12 @@ function registerReviewTool(pi: ExtensionAPI): void {
     name: "gograph_review",
     label: "Gograph Review",
     description:
-      "Post-edit review. Checks: are all callers tested, did complexity increase, were new SQL or env reads introduced, were any interfaces broken. ONE call replaces gograph_impact + gograph_context + gograph_callers.",
+      "Post-edit verification. Returns: code changes, complexity drift, test coverage status, and risk evaluation."
+      + " With uncommitted=true, reviews all uncommitted changes."
+      + " Automatically rebuilds the AST index first so the review reflects your latest edits. Use skipRebuild=true to skip.",
     promptSnippet: "Review Go code changes for issues",
     promptGuidelines: [
-      "Use gograph_review AFTER editing Go code to verify nothing is broken. This ONE call replaces gograph_impact + gograph_context + gograph_callers called separately.",
+      "Use gograph_review AFTER editing Go code to verify nothing is broken — checks complexity drift, test coverage, and risk.",
       "Use gograph_review with uncommitted=true to review all uncommitted changes at once.",
       'When the user says "review", "verify", "check my changes", or "did I break anything" → use gograph_review, not a sequence of other gograph tools.',
     ],
@@ -345,6 +383,17 @@ function registerReviewTool(pi: ExtensionAPI): void {
       args.push("--json");
       return args;
     },
+    preExecute: async (p, signal) => {
+      if (p.skipRebuild) return null;
+      try {
+        await runGographBuild(["build", "."], signal, 60_000);
+        return "index rebuilt";
+      } catch (err) {
+        return `rebuild failed: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    },
+    useBuildLock: true,
+    timeout: 60_000,
     renderCallArgs: (a, t) =>
       a.uncommitted
         ? t.fg("accent", "--uncommitted")

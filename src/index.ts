@@ -52,22 +52,22 @@ export default function gographExtension(pi: ExtensionAPI) {
               "\n\n## Go Code Navigation (gograph)\n" +
               "This Go project has a gograph AST index. Use gograph tools instead of grep/cat for ALL structural Go queries.\n\n" +
               "### Default workflow\n" +
-              "- Before editing → `gograph_plan` (one call, replaces 4-5 separate queries)\n" +
-              "- After editing → `gograph_review` (one call, replaces 3-4 separate queries)\n" +
-              "- To understand a symbol → `gograph_explain` (one call, replaces 6-8 separate queries)\n\n" +
-              "### All tools\n" +
-              "- `gograph_plan` — pre-edit safety: callers, tests, blast radius, SQL/env exposure\n" +
-              "- `gograph_review` — post-edit review: test coverage, complexity, broken interfaces\n" +
-              "- `gograph_explain` — architectural narrative for any symbol\n" +
-              "- `gograph_context` — source + callers + callees + tests for one symbol\n" +
-              "- `gograph_query` — search symbols by name\n" +
-              "- `gograph_implementers` — find structs implementing an interface\n" +
-              "- `gograph_endpoint` — HTTP handler → SQL vertical slice\n" +
-              "- `gograph` — generic tool for callers, callees, source, fields, impact, path, etc.\n\n" +
+              "- Before editing → `gograph_plan`\n" +
+              "- After editing → `gograph_review`\n" +
+              "- To understand a symbol → `gograph_explain`\n\n" +
+              "### Tools\n" +
+              "- `gograph_plan` — pre-edit change plan: callers, tests, blast radius, SQL/env/route exposure\n" +
+              "- `gograph_review` — post-edit verification: complexity drift, test coverage, risk evaluation\n" +
+              "- `gograph_explain` — architectural narrative: purpose, complexity, SQL, routes, role classification\n" +
+              "- `gograph_context` — source + callers + callees + tests + role for one symbol\n" +
+              "- `gograph_query` — case-insensitive symbol search\n" +
+              "- `gograph_implementers` — structs satisfying an interface (duck-typing)\n" +
+              "- `gograph_endpoint` — HTTP endpoint vertical slice: handler → callees → SQL → env\n" +
+              "- `gograph` — subcommands: callers, callees, source, fields, impact, path, returnusage, errorflow, etc.\n\n" +
               "### Rules\n" +
               "- NEVER use grep/cat/read for Go symbols, types, functions, or struct fields — use gograph instead. grep is fine for string literals, comments, and non-Go files.\n" +
-              "- NEVER chain gograph_context + gograph_callers + gograph_impact separately — use gograph_plan or gograph_explain instead\n" +
-              "- Use `gograph` subcommands only when a primary tool doesn't cover the need\n",
+              "- Prefer gograph_plan / gograph_explain over chaining multiple queries — they aggregate results in one call.\n" +
+              "- Use `gograph` subcommands only when no primary tool covers the need.\n"
           };
         });
       }

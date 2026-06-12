@@ -17,7 +17,6 @@ Gograph builds a compact graph of your Go project's packages, symbols, calls, ro
 - `gograph_explain` — architectural narrative in ONE call
 - `gograph_context` replaces 4-5 grep/cat calls in one shot
 - `gograph_implementers` reliably finds interface implementations
-- `gograph_impact` shows blast radius before you change a function
 - `gograph_endpoint` traces HTTP handlers from route to SQL
 
 ## Prerequisites
