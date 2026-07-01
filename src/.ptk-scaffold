@@ -1,0 +1,5 @@
+# .ptk-scaffold — written by ptk-scaffold, removed by ptk-finalize.
+# feature: upstream-sync
+# language: typescript
+# Frontier pattern (ERE): matches unfilled stub() call sites in this tree.
+stub\("

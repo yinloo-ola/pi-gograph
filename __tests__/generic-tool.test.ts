@@ -112,3 +112,10 @@ describe("buildGenericArgs", () => {
     })).toEqual(["source", "MyFunc", "--json"]);
   });
 });
+describe("dynamic discovery & graph-free gating (scaffold placeholders)", () => {
+  it.todo("registerGenericTool advertises exactly the cached capabilities' subcommands");
+  it.todo("execute skips ensureReady for graph-free subcommands (e.g. doc)");
+  it.todo("execute calls ensureReady for graph-dependent subcommands (e.g. callers)");
+  it.todo("description lists curated one-line docs for known subcommands and name-only for unknown ones");
+  it.todo("falls back to DEFAULT_CAPABILITIES subcommands when the cache is empty");
+});

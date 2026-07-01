@@ -5,6 +5,7 @@ import { registerTools } from "./tools.js";
 import { registerGenericTool } from "./generic-tool.js";
 import { registerCommands } from "./commands.js";
 import { getBackgroundStatus, scheduleBackgroundRefresh } from "./refresh.js";
+import { discoverCapabilities, setCachedCapabilities } from "./capabilities.js";
 
 function showStatus(
   ctx: { ui: { setStatus: (key: string, value: string | undefined) => void } },
@@ -41,6 +42,10 @@ export default function gographExtension(pi: ExtensionAPI) {
       const installed = await isGographInstalled();
       const indexed = installed ? await hasIndex(ctx.cwd) : false;
 
+      // Discover available subcommands once per session; the generic tool reads
+      // the cache synchronously at registration. Degrades to defaults on failure.
+      setCachedCapabilities(await discoverCapabilities());
+
       registerTools(pi);
       registerGenericTool(pi);
       registerCommands(pi);
@@ -52,10 +57,13 @@ export default function gographExtension(pi: ExtensionAPI) {
               "\n\n## Go Code Navigation (gograph)\n" +
               "This Go project has a gograph AST index. Use gograph tools instead of grep/cat for ALL structural Go queries.\n\n" +
               "### Default workflow\n" +
-              "- Before editing → `gograph_plan`\n" +
+              "- Session start → `gograph_summary` (codebase briefing in one call)\n" +
+              "- Before editing → `gograph_plan`, then `gograph_risk` for a SAFE/REVIEW/DANGER verdict\n" +
               "- After editing → `gograph_review`\n" +
               "- To understand a symbol → `gograph_explain`\n\n" +
               "### Tools\n" +
+              "- `gograph_summary` — one-call codebase briefing: hotspots, coupling, orphans, complexity, god objects\n" +
+              "- `gograph_risk` — change risk score (0–100) + SAFE/REVIEW/DANGER verdict: blast radius, complexity, coverage, API, SQL/env\n" +
               "- `gograph_plan` — pre-edit change plan: callers, tests, blast radius, SQL/env/route exposure\n" +
               "- `gograph_review` — post-edit verification: complexity drift, test coverage, risk evaluation\n" +
               "- `gograph_explain` — architectural narrative: purpose, complexity, SQL, routes, role classification\n" +
@@ -66,7 +74,7 @@ export default function gographExtension(pi: ExtensionAPI) {
               "- `gograph` — subcommands: callers, callees, source, fields, impact, path, returnusage, errorflow, etc.\n\n" +
               "### Rules\n" +
               "- NEVER use grep/cat/read for Go symbols, types, functions, or struct fields — use gograph instead. grep is fine for string literals, comments, and non-Go files.\n" +
-              "- Prefer gograph_plan / gograph_explain over chaining multiple queries — they aggregate results in one call.\n" +
+              "- Prefer gograph_summary / gograph_plan / gograph_risk / gograph_explain over chaining multiple queries — they aggregate results in one call.\n" +
               "- Use `gograph` subcommands only when no primary tool covers the need.\n"
           };
         });
