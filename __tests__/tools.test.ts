@@ -126,25 +126,47 @@ describe("reviewBuildArgs", () => {
 });
 
 describe("registration", () => {
-  it("registerTools registers both risk and summary tools", () => {
+  function captureRegistered(): { names: string[]; pi: ExtensionAPI } {
     const names: string[] = [];
     const pi = {
       registerTool: (t: { name: string }) => {
         names.push(t.name);
       },
     } as unknown as ExtensionAPI;
-    registerTools(pi);
+    return { names, pi };
+  }
+
+  it("registers risk and summary when gograph version is sufficient", () => {
+    const { names, pi } = captureRegistered();
+    registerTools(pi, "1.4.82");
     expect(names).toContain("gograph_risk");
     expect(names).toContain("gograph_summary");
   });
-it("always registers the version-independent core tools", () => {
-    const names: string[] = [];
-    const pi = {
-      registerTool: (t: { name: string }) => {
-        names.push(t.name);
-      },
-    } as unknown as ExtensionAPI;
-    registerTools(pi);
+
+  it("omits risk and summary when gograph version is too old", () => {
+    const { names, pi } = captureRegistered();
+    registerTools(pi, "1.4.77");
+    expect(names).not.toContain("gograph_risk");
+    expect(names).not.toContain("gograph_summary");
+  });
+
+  it("omits risk and summary when version is null/unknown", () => {
+    const { names, pi } = captureRegistered();
+    registerTools(pi, null);
+    expect(names).not.toContain("gograph_risk");
+    expect(names).not.toContain("gograph_summary");
+  });
+
+  it("registers summary (1.4.78) but not risk (needs 1.4.81) at the summary threshold", () => {
+    const { names, pi } = captureRegistered();
+    registerTools(pi, "1.4.78");
+    expect(names).toContain("gograph_summary");
+    expect(names).not.toContain("gograph_risk");
+  });
+
+  it("always registers the version-independent core tools", () => {
+    const { names, pi } = captureRegistered();
+    registerTools(pi, null);
     for (const n of [
       "gograph_build",
       "gograph_query",

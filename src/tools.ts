@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, TSchema } from "typebox";
 import { Text } from "@earendil-works/pi-tui";
-import { isGographInstalledSync, gographNotInstalledError } from "./detect.js";
+import { isGographInstalledSync, gographNotInstalledError, versionMeets } from "./detect.js";
 import { runGograph, runGographBuild, formatOutput, ensureReady } from "./runner.js";
 
 // ── Parameter schemas ────────────────────────────────────────────────────────
@@ -172,7 +172,11 @@ function registerSimpleTool(pi: ExtensionAPI, config: SimpleToolConfig): void {
 
 // ── Tool registration ────────────────────────────────────────────────────────
 
-export function registerTools(pi: ExtensionAPI): void {
+/** Minimum gograph versions required for the version-gated primary tools. */
+export const RISK_MIN_VERSION = "1.4.81";
+export const SUMMARY_MIN_VERSION = "1.4.78";
+
+export function registerTools(pi: ExtensionAPI, version: string | null = null): void {
   registerBuildTool(pi);
   registerQueryTool(pi);
   registerContextTool(pi);
@@ -181,8 +185,8 @@ export function registerTools(pi: ExtensionAPI): void {
   registerPlanTool(pi);
   registerExplainTool(pi);
   registerReviewTool(pi);
-  registerRiskTool(pi);
-  registerSummaryTool(pi);
+  if (versionMeets(version, SUMMARY_MIN_VERSION)) registerSummaryTool(pi);
+  if (versionMeets(version, RISK_MIN_VERSION)) registerRiskTool(pi);
 }
 
 function registerBuildTool(pi: ExtensionAPI): void {
