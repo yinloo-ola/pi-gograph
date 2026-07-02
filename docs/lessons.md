@@ -15,6 +15,7 @@ Retire rules that no longer apply during finalizing.
 
 - Use `pi.exec()` (not `execSync`) for actual CLI calls in the runner — `execSync` is only acceptable for quick availability checks (e.g., `which gograph`, `gograph --version`)
 - Provide sync and async wrappers when a check function is needed in both sync callbacks (e.g., `buildArgs`) and async contexts — the async wrapper should delegate to the sync one to avoid duplication
+- When the package-lock.json has local file-path resolutions (e.g. ../../.nvm/versions/node/...), regenerate it with `npm install --package-lock-only` before pushing — CI uses `npm ci` and cannot resolve local paths. Check with `grep nvm package-lock.json`.
 
 ## Testing
 
