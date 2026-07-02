@@ -250,11 +250,7 @@ function registerContextTool(pi: ExtensionAPI): void {
       "Use gograph_context with uncommitted=true to get context for everything you've changed but not yet committed.",
     ],
     parameters: ContextParams,
-    buildArgs: (p) => {
-      if (p.uncommitted) return ["context", "--uncommitted", "--json"];
-      if (p.symbol) return ["context", p.symbol, "--json"];
-      throw new Error("Provide either a symbol name or set uncommitted=true.");
-    },
+    buildArgs: contextBuildArgs,
     renderCallArgs: (a, t) =>
       a.uncommitted ? t.fg("accent", "--uncommitted") : t.fg("accent", `"${a.symbol}"`),
     renderExpanded: (r, t) => t.fg("dim", r.content[0]?.text?.slice(0, 3000) ?? ""),
@@ -323,15 +319,7 @@ function registerPlanTool(pi: ExtensionAPI): void {
       'When the user says "plan", "prepare", "before editing", or "what will be affected" → use gograph_plan, not a sequence of other gograph tools.',
     ],
     parameters: PlanParams,
-    buildArgs: (p) => {
-      const args: string[] = ["plan"];
-      if (p.uncommitted) args.push("--uncommitted");
-      else if (p.symbol) args.push(p.symbol);
-      else throw new Error("Provide either a symbol name or set uncommitted=true.");
-      if (p.withContext) args.push("--with-context");
-      args.push("--json");
-      return args;
-    },
+    buildArgs: planBuildArgs,
     renderCallArgs: (a, t) => {
       let text = a.uncommitted
         ? t.fg("accent", "--uncommitted")
@@ -377,14 +365,7 @@ function registerReviewTool(pi: ExtensionAPI): void {
       'When the user says "review", "verify", "check my changes", or "did I break anything" → use gograph_review, not a sequence of other gograph tools.',
     ],
     parameters: ReviewParams,
-    buildArgs: (p) => {
-      const args: string[] = ["review"];
-      if (p.uncommitted) args.push("--uncommitted");
-      else if (p.symbol) args.push(p.symbol);
-      else throw new Error("Provide either a symbol name or set uncommitted=true.");
-      args.push("--json");
-      return args;
-    },
+    buildArgs: reviewBuildArgs,
     preExecute: async (p, signal) => {
       if (p.skipRebuild) return null;
       try {
@@ -402,6 +383,35 @@ function registerReviewTool(pi: ExtensionAPI): void {
         : t.fg("accent", `"${a.symbol}"`),
     renderExpanded: (r, t) => t.fg("dim", r.content[0]?.text?.slice(0, 3000) ?? ""),
   });
+}
+// ── buildArgs helpers (extracted for testability) ────────────────────────────
+
+/** Build `gograph context` CLI args. Throws if neither symbol nor uncommitted is set. */
+export function contextBuildArgs(p: { symbol?: string; uncommitted?: boolean }): string[] {
+  if (p.uncommitted) return ["context", "--uncommitted", "--json"];
+  if (p.symbol) return ["context", p.symbol, "--json"];
+  throw new Error("Provide either a symbol name or set uncommitted=true.");
+}
+
+/** Build `gograph plan` CLI args. Throws if neither symbol nor uncommitted is set. */
+export function planBuildArgs(p: { symbol?: string; uncommitted?: boolean; withContext?: boolean }): string[] {
+  const args: string[] = ["plan"];
+  if (p.uncommitted) args.push("--uncommitted");
+  else if (p.symbol) args.push(p.symbol);
+  else throw new Error("Provide either a symbol name or set uncommitted=true.");
+  if (p.withContext) args.push("--with-context");
+  args.push("--json");
+  return args;
+}
+
+/** Build `gograph review` CLI args. Throws if neither symbol nor uncommitted is set. */
+export function reviewBuildArgs(p: { symbol?: string; uncommitted?: boolean }): string[] {
+  const args: string[] = ["review"];
+  if (p.uncommitted) args.push("--uncommitted");
+  else if (p.symbol) args.push(p.symbol);
+  else throw new Error("Provide either a symbol name or set uncommitted=true.");
+  args.push("--json");
+  return args;
 }
 // ── Upstream-sync tools (risk, summary) ─────────────────────────────────────
 //

@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { registerTools, riskBuildArgs, summaryBuildArgs } from "../src/tools.js";
+import {
+  registerTools,
+  riskBuildArgs,
+  summaryBuildArgs,
+  contextBuildArgs,
+  planBuildArgs,
+  reviewBuildArgs,
+} from "../src/tools.js";
 
 describe("registerTools", () => {
   it("exports a registerTools function", () => {
@@ -35,6 +42,86 @@ describe("riskBuildArgs", () => {
 describe("summaryBuildArgs", () => {
   it("emits [summary, --json] with no parameters", () => {
     expect(summaryBuildArgs()).toEqual(["summary", "--json"]);
+  });
+});
+describe("contextBuildArgs", () => {
+  it("emits [context, --uncommitted, --json] when uncommitted=true", () => {
+    expect(contextBuildArgs({ uncommitted: true })).toEqual([
+      "context",
+      "--uncommitted",
+      "--json",
+    ]);
+  });
+
+  it("emits [context, symbol, --json] for a symbol", () => {
+    expect(contextBuildArgs({ symbol: "ValidateToken" })).toEqual([
+      "context",
+      "ValidateToken",
+      "--json",
+    ]);
+  });
+
+  it("throws when neither symbol nor uncommitted is given", () => {
+    expect(() => contextBuildArgs({})).toThrow(
+      "Provide either a symbol name or set uncommitted=true.",
+    );
+  });
+});
+
+describe("planBuildArgs", () => {
+  it("emits [plan, symbol, --json] for a symbol", () => {
+    expect(planBuildArgs({ symbol: "ValidateToken" })).toEqual([
+      "plan",
+      "ValidateToken",
+      "--json",
+    ]);
+  });
+
+  it("emits [plan, --uncommitted, --json] when uncommitted=true", () => {
+    expect(planBuildArgs({ uncommitted: true })).toEqual([
+      "plan",
+      "--uncommitted",
+      "--json",
+    ]);
+  });
+
+  it("appends --with-context when withContext=true", () => {
+    expect(planBuildArgs({ symbol: "X", withContext: true })).toEqual([
+      "plan",
+      "X",
+      "--with-context",
+      "--json",
+    ]);
+  });
+
+  it("throws when neither symbol nor uncommitted is given", () => {
+    expect(() => planBuildArgs({})).toThrow(
+      "Provide either a symbol name or set uncommitted=true.",
+    );
+  });
+});
+
+describe("reviewBuildArgs", () => {
+  it("emits [review, symbol, --json] for a symbol", () => {
+    expect(reviewBuildArgs({ symbol: "ValidateToken" })).toEqual([
+      "review",
+      "ValidateToken",
+      "--json",
+    ]);
+  });
+
+  it("emits [review, --uncommitted, --json] when uncommitted=true", () => {
+    expect(reviewBuildArgs({ uncommitted: true })).toEqual([
+      "review",
+      "--uncommitted",
+      "--json",
+    ]);
+  });
+
+  it("throws when neither symbol nor uncommitted is given", () => {
+    expect(() => reviewBuildArgs({})).toThrow(
+      "Provide either a symbol name or set uncommitted=true.",
+    );
   });
 });
 
