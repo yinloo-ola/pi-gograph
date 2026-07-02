@@ -2,18 +2,25 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Text } from "@earendil-works/pi-tui";
 import { runGograph, formatOutput, ensureReady } from "./runner.js";
-
-// ── Subcommand definitions ────────────────────────────────────────────────────
-
+/** Curated long-tail query subcommands exposed via the generic dispatcher.
+ *  Grown deliberately when a new gograph command earns a place — NOT auto-discovered
+ *  (see docs/plans/2026-07-01-upstream-sync-decisions.md). */
 const SUBCOMMANDS = [
   "callers", "callees", "source", "fields", "impact", "path",
   "returnusage", "errorflow", "changes", "check", "focus", "stats",
-  "dependents", "usages", "literals",
-] as const;
+  "dependents", "usages", "literals", "doc",
+];
 
-type Subcommand = (typeof SUBCOMMANDS)[number];
-
-const SubcommandLiteral = SUBCOMMANDS.map((s) => Type.Literal(s));
+// ── Curated per-subcommand metadata ─────────────────────────────────────────
+//
+// The exposed subcommands live in the SUBCOMMANDS list above (hand-curated,
+// grown deliberately — NOT auto-discovered; see
+// docs/plans/2026-07-01-upstream-sync-decisions.md). These maps hold the
+// per-command metadata: which flags a subcommand supports, whether it needs
+// the graph, and a one-line doc for the LLM. They are intentionally tolerant
+// — a subcommand not listed here simply gets no typed flags and a name-only
+// description, and still works via the `flags` passthrough. Add a subcommand
+// to these maps only when typed flag support or a richer doc is worth it.
 
 /** Commands that accept --depth flag */
 const DEPTH_COMMANDS = new Set<string>(["callers", "callees", "path"]);
@@ -29,44 +36,42 @@ const UNCOMMITTED_COMMANDS = new Set<string>(["impact", "check"]);
 /** Commands that need no target argument */
 const NO_TARGET_COMMANDS = new Set<string>(["stats", "changes", "check"]);
 
-// ── Parameter schema ──────────────────────────────────────────────────────────
+/**
+ * Commands that do NOT require a built AST index (work without .gograph/graph.json).
+ * `doc` is a thin `go doc` wrapper; future graph-free commands belong here.
+ * These skip the ensureReady guard so they work even before the first build.
+ */
+const GRAPH_FREE_COMMANDS = new Set<string>(["doc"]);
+/** Whether a subcommand needs a built AST index. Graph-free commands (e.g. `doc`)
+ *  return false and skip the ensureReady guard. Exported for direct unit testing. */
+export function needsGraph(subcommand: string): boolean {
+  return !GRAPH_FREE_COMMANDS.has(subcommand);
+}
 
-const GographParams = Type.Object({
-  subcommand: Type.Union(SubcommandLiteral, {
-    description: "Gograph subcommand",
-  }),
-  target: Type.String({
-    description: "Primary argument — symbol name, package path, or error term depending on subcommand. Use empty string for stats/changes/check.",
-  }),
-  from: Type.Optional(
-    Type.String({
-      description: "Second symbol (for 'path' subcommand: call chain from target → from).",
-    }),
-  ),
-  depth: Type.Optional(
-    Type.Number({
-      description: "BFS depth 1–10 (callers, callees, path only)",
-      minimum: 1,
-      maximum: 10,
-    }),
-  ),
-  filesOnly: Type.Optional(
-    Type.Boolean({ description: "Return only file paths" }),
-  ),
-  uncommitted: Type.Optional(
-    Type.Boolean({ description: "Check uncommitted changes only" }),
-  ),
-  flags: Type.Optional(
-    Type.String({
-      description: "Rare flags: --git <ref>, --since <ref>, --test-only, --no-tests, --precise",
-    }),
-  ),
-});
+/** Curated one-line docs for known subcommands. Unknown ones get name-only. */
+const SUBCOMMAND_DOCS: Record<string, string> = {
+  callers: "find all callers of a function. Supports --depth N for transitive callers.",
+  callees: "find all functions called from within a target function. Supports --depth N.",
+  source: "extract exact source code for a symbol from the AST index.",
+  fields: "list all fields of a struct.",
+  impact: "calculate transitive downstream blast radius of a symbol. Supports --uncommitted.",
+  path: "find shortest call chain (BFS) between two symbols. Requires both target and from.",
+  returnusage: "trace how callers consume a function's return values (discarded, assigned, passed, etc.).",
+  errorflow: "trace an error string from declaration through return/wrapping up to HTTP entry points.",
+  changes: 'find symbols in changed files. Use flags: "--git main".',
+  check: "run static policy checks against package boundaries and test requirements. Supports --uncommitted.",
+  focus: "get all files, symbols, internal calls, and dependencies for a package.",
+  stats: "index health summary: package count, symbol count, call count, etc.",
+  dependents: "find all packages that import a given package.",
+  usages: "find all places a type appears in signatures and struct fields.",
+  literals: "find all struct literal initialization sites.",
+doc: "surface Go documentation for any stdlib or third-party symbol (no graph needed).",
+};
 
 // ── Arg builder (exported for testing) ──────────────────────────────────────
 
 interface GenericInput {
-  subcommand: Subcommand;
+  subcommand: string;
   target: string;
   from?: string;
   depth?: number;
@@ -115,43 +120,78 @@ export function buildGenericArgs(params: GenericInput): string[] {
   return args;
 }
 
+/** Build the LLM-facing description listing discovered subcommands dynamically. */
+function buildGenericDescription(subcommands: string[]): string {
+  const lines = subcommands.map((name) => {
+    const doc = SUBCOMMAND_DOCS[name];
+    return doc ? `${name} — ${doc}` : name;
+  });
+  return (
+    "Run gograph CLI subcommands for Go code queries not covered by primary tools.\n\n"
+    + "Available subcommands (discovered from your installed gograph):\n"
+    + lines.map((l) => `- ${l}`).join("\n")
+    + "\n\nUse the `flags` parameter for rare flags (--git, --since, --test-only, --no-tests).\n\n"
+    + "Examples:\n"
+    + '- callers: gograph(subcommand="callers", target="HandleUser", depth=3)\n'
+    + '- path: gograph(subcommand="path", target="HandleUser", from="DB.Save")\n'
+    + '- stats: gograph(subcommand="stats", target="")'
+  );
+}
+
 // ── Tool registration ────────────────────────────────────────────────────────
 
 export function registerGenericTool(pi: ExtensionAPI): void {
+  const subcommands = SUBCOMMANDS;
+
+  const GographParams = Type.Object({
+    subcommand: Type.Union(
+      subcommands.map((name) => Type.Literal(name)),
+      { description: "Gograph subcommand" },
+    ),
+    target: Type.String({
+      description: "Primary argument — symbol name, package path, or error term depending on subcommand. Use empty string for stats/changes/check.",
+    }),
+    from: Type.Optional(
+      Type.String({
+        description: "Second symbol (for 'path' subcommand: call chain from target → from).",
+      }),
+    ),
+    depth: Type.Optional(
+      Type.Number({
+        description: "BFS depth 1–10 (callers, callees, path only)",
+        minimum: 1,
+        maximum: 10,
+      }),
+    ),
+    filesOnly: Type.Optional(
+      Type.Boolean({ description: "Return only file paths" }),
+    ),
+    uncommitted: Type.Optional(
+      Type.Boolean({ description: "Check uncommitted changes only" }),
+    ),
+    flags: Type.Optional(
+      Type.String({
+        description: "Rare flags: --git <ref>, --since <ref>, --test-only, --no-tests",
+      }),
+    ),
+  });
+
   pi.registerTool({
     name: "gograph",
     label: "Gograph",
-    description:
-      "Run gograph CLI subcommands for Go code queries not covered by primary tools.\n\n"
-      + "callers — find all callers of a function. Supports --depth N for transitive callers.\n"
-      + "callees — find all functions called from within a target function. Supports --depth N.\n"
-      + "source — extract exact source code for a symbol from the AST index.\n"
-      + "fields — list all fields of a struct.\n"
-      + "impact — calculate transitive downstream blast radius of a symbol. Supports --uncommitted.\n"
-      + "path — find shortest call chain (BFS) between two symbols. Requires both target and from.\n"
-      + "returnusage — trace how callers consume a function's return values (discarded, assigned, passed, etc.).\n"
-      + "errorflow — trace an error string from declaration through return/wrapping up to HTTP entry points.\n"
-      + "changes — find symbols in changed files. Use flags: \"--git main\".\n"
-      + "check — run static policy checks against package boundaries and test requirements. Supports --uncommitted.\n"
-      + "focus — get all files, symbols, internal calls, and dependencies for a package.\n"
-      + "stats — index health summary: package count, symbol count, call count, etc.\n"
-      + "dependents — find all packages that import a given package.\n"
-      + "usages — find all places a type appears in signatures and struct fields.\n"
-      + "literals — find all struct literal initialization sites.\n\n"
-      + "Examples:\n"
-      + '- callers: gograph(subcommand="callers", target="HandleUser", depth=3)\n'
-      + '- path: gograph(subcommand="path", target="HandleUser", from="DB.Save")\n'
-      + '- fields: gograph(subcommand="fields", target="UserConfig")\n'
-      + '- stats: gograph(subcommand="stats", target="")',
+    description: buildGenericDescription(subcommands),
     promptSnippet: "Go code queries: callers, callees, source, fields, impact, path, returnusage, errorflow, etc.",
     promptGuidelines: [
-      "Prefer primary tools (gograph_plan, gograph_review, gograph_explain, gograph_context) when they cover your need — they aggregate multiple subcommands in one call.",
+      "Prefer primary tools (gograph_summary, gograph_plan, gograph_review, gograph_risk, gograph_explain, gograph_context) when they cover your need — they aggregate multiple subcommands in one call.",
       "Use this generic tool only when no primary tool covers the query.",
       'For the "path" subcommand, always provide both "target" and "from".',
+      '"doc" works without a built index — use it for stdlib/third-party symbol signatures.',
     ],
     parameters: GographParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      await ensureReady(pi, ctx);
+if (needsGraph(params.subcommand)) {
+        await ensureReady(pi, ctx);
+      }
       const args = buildGenericArgs(params as unknown as GenericInput);
       const output = await runGograph(args, signal);
       const { text, truncated, totalLines } = formatOutput(output);

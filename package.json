@@ -1,6 +1,6 @@
 {
   "name": "pi-gograph",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Gograph integration for pi — AST-aware Go code navigation",
   "type": "module",
   "license": "MIT",
@@ -43,5 +43,9 @@
     "typebox": "^1.1.38",
     "typescript": "^6.0.3",
     "vitest": "^3.0.0"
+  }
+,
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.60.4"
   }
 }

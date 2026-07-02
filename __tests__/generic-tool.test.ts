@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildGenericArgs } from "../src/generic-tool.js";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { buildGenericArgs, needsGraph, registerGenericTool } from "../src/generic-tool.js";
 
 describe("buildGenericArgs", () => {
   it("builds callers with depth", () => {
@@ -110,5 +111,31 @@ describe("buildGenericArgs", () => {
       target: "MyFunc",
       uncommitted: true,
     })).toEqual(["source", "MyFunc", "--json"]);
+  });
+});
+describe("needsGraph", () => {
+  it("returns false for graph-free subcommands (doc)", () => {
+    expect(needsGraph("doc")).toBe(false);
+  });
+
+  it("returns true for graph-dependent subcommands", () => {
+    expect(needsGraph("callers")).toBe(true);
+    expect(needsGraph("stats")).toBe(true);
+  });
+});
+
+describe("registerGenericTool", () => {
+  it("registers a 'gograph' tool advertising curated subcommands in its description", () => {
+    const registered: { name: string; description: string }[] = [];
+    const pi = {
+      registerTool: (t: { name: string; description: string }) => {
+        registered.push({ name: t.name, description: t.description });
+      },
+    } as unknown as ExtensionAPI;
+    registerGenericTool(pi);
+    const g = registered.find((t) => t.name === "gograph");
+    expect(g).toBeDefined();
+    expect(g!.description).toContain("callers");
+    expect(g!.description).toContain("doc");
   });
 });

@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, TSchema } from "typebox";
 import { Text } from "@earendil-works/pi-tui";
-import { isGographInstalledSync, gographNotInstalledError } from "./detect.js";
+import { isGographInstalledSync, gographNotInstalledError, versionMeets } from "./detect.js";
 import { runGograph, runGographBuild, formatOutput, ensureReady } from "./runner.js";
 
 // ── Parameter schemas ────────────────────────────────────────────────────────
@@ -172,7 +172,11 @@ function registerSimpleTool(pi: ExtensionAPI, config: SimpleToolConfig): void {
 
 // ── Tool registration ────────────────────────────────────────────────────────
 
-export function registerTools(pi: ExtensionAPI): void {
+/** Minimum gograph versions required for the version-gated primary tools. */
+export const RISK_MIN_VERSION = "1.4.81";
+export const SUMMARY_MIN_VERSION = "1.4.78";
+
+export function registerTools(pi: ExtensionAPI, version: string | null = null): void {
   registerBuildTool(pi);
   registerQueryTool(pi);
   registerContextTool(pi);
@@ -181,6 +185,8 @@ export function registerTools(pi: ExtensionAPI): void {
   registerPlanTool(pi);
   registerExplainTool(pi);
   registerReviewTool(pi);
+  if (versionMeets(version, SUMMARY_MIN_VERSION)) registerSummaryTool(pi);
+  if (versionMeets(version, RISK_MIN_VERSION)) registerRiskTool(pi);
 }
 
 function registerBuildTool(pi: ExtensionAPI): void {
@@ -248,11 +254,7 @@ function registerContextTool(pi: ExtensionAPI): void {
       "Use gograph_context with uncommitted=true to get context for everything you've changed but not yet committed.",
     ],
     parameters: ContextParams,
-    buildArgs: (p) => {
-      if (p.uncommitted) return ["context", "--uncommitted", "--json"];
-      if (p.symbol) return ["context", p.symbol, "--json"];
-      throw new Error("Provide either a symbol name or set uncommitted=true.");
-    },
+    buildArgs: contextBuildArgs,
     renderCallArgs: (a, t) =>
       a.uncommitted ? t.fg("accent", "--uncommitted") : t.fg("accent", `"${a.symbol}"`),
     renderExpanded: (r, t) => t.fg("dim", r.content[0]?.text?.slice(0, 3000) ?? ""),
@@ -321,15 +323,7 @@ function registerPlanTool(pi: ExtensionAPI): void {
       'When the user says "plan", "prepare", "before editing", or "what will be affected" → use gograph_plan, not a sequence of other gograph tools.',
     ],
     parameters: PlanParams,
-    buildArgs: (p) => {
-      const args: string[] = ["plan"];
-      if (p.uncommitted) args.push("--uncommitted");
-      else if (p.symbol) args.push(p.symbol);
-      else throw new Error("Provide either a symbol name or set uncommitted=true.");
-      if (p.withContext) args.push("--with-context");
-      args.push("--json");
-      return args;
-    },
+    buildArgs: planBuildArgs,
     renderCallArgs: (a, t) => {
       let text = a.uncommitted
         ? t.fg("accent", "--uncommitted")
@@ -375,14 +369,7 @@ function registerReviewTool(pi: ExtensionAPI): void {
       'When the user says "review", "verify", "check my changes", or "did I break anything" → use gograph_review, not a sequence of other gograph tools.',
     ],
     parameters: ReviewParams,
-    buildArgs: (p) => {
-      const args: string[] = ["review"];
-      if (p.uncommitted) args.push("--uncommitted");
-      else if (p.symbol) args.push(p.symbol);
-      else throw new Error("Provide either a symbol name or set uncommitted=true.");
-      args.push("--json");
-      return args;
-    },
+    buildArgs: reviewBuildArgs,
     preExecute: async (p, signal) => {
       if (p.skipRebuild) return null;
       try {
@@ -398,6 +385,107 @@ function registerReviewTool(pi: ExtensionAPI): void {
       a.uncommitted
         ? t.fg("accent", "--uncommitted")
         : t.fg("accent", `"${a.symbol}"`),
+    renderExpanded: (r, t) => t.fg("dim", r.content[0]?.text?.slice(0, 3000) ?? ""),
+  });
+}
+// ── buildArgs helpers (extracted for testability) ────────────────────────────
+const SYMBOL_OR_UNCOMMITTED_ERROR = "Provide either a symbol name or set uncommitted=true.";
+
+/** Build the [cmd, <symbol|--uncommitted>] prefix. Throws SYMBOL_OR_UNCOMMITTED_ERROR if neither is set. */
+function symbolOrUncommittedArgs(
+  cmd: string,
+  p: { symbol?: string; uncommitted?: boolean },
+): string[] {
+  if (p.uncommitted) return [cmd, "--uncommitted"];
+  if (p.symbol) return [cmd, p.symbol];
+  throw new Error(SYMBOL_OR_UNCOMMITTED_ERROR);
+}
+
+/** Build `gograph context` CLI args. Throws if neither symbol nor uncommitted is set. */
+export function contextBuildArgs(p: { symbol?: string; uncommitted?: boolean }): string[] {
+  return [...symbolOrUncommittedArgs("context", p), "--json"];
+}
+
+/** Build `gograph plan` CLI args. Throws if neither symbol nor uncommitted is set. */
+export function planBuildArgs(p: { symbol?: string; uncommitted?: boolean; withContext?: boolean }): string[] {
+  const args = [...symbolOrUncommittedArgs("plan", p)];
+  if (p.withContext) args.push("--with-context");
+  args.push("--json");
+  return args;
+}
+
+/** Build `gograph review` CLI args. Throws if neither symbol nor uncommitted is set. */
+export function reviewBuildArgs(p: { symbol?: string; uncommitted?: boolean }): string[] {
+  return [...symbolOrUncommittedArgs("review", p), "--json"];
+}
+// ── Upstream-sync tools (risk, summary) ─────────────────────────────────────
+//
+// These wrap gograph's aggregator commands promoted to primary-tool status
+// (see docs/plans/2026-07-01-upstream-sync-decisions.md). Each is a thin
+// registerSimpleTool config: typed params + buildArgs + prompt routing. The
+// behavior comes from the gograph CLI; our code only routes args. buildArgs is
+// extracted as an exported pure function so it can be unit-tested directly.
+
+const RiskParams = Type.Object({
+  symbol: Type.Optional(
+    Type.String({ description: "Symbol to score. Required unless uncommitted=true." }),
+  ),
+  uncommitted: Type.Optional(
+    Type.Boolean({ description: "Score all uncommitted changes. Default: false." }),
+  ),
+});
+
+const SummaryParams = Type.Object({});
+
+/** Build `gograph risk` CLI args. Throws if neither symbol nor uncommitted is set. */
+export function riskBuildArgs(p: { symbol?: string; uncommitted?: boolean }): string[] {
+  return [...symbolOrUncommittedArgs("risk", p), "--json"];
+}
+
+/** Build `gograph summary` CLI args. */
+export function summaryBuildArgs(): string[] {
+  return ["summary", "--json"];
+}
+
+/** Register `gograph_risk` — a 0–100 change-risk score with a SAFE/REVIEW/DANGER verdict. */
+export function registerRiskTool(pi: ExtensionAPI): void {
+  registerSimpleTool(pi, {
+    name: "gograph_risk",
+    label: "Gograph Risk",
+    description:
+      "Normalized 0–100 change-risk score with a SAFE / REVIEW / DANGER verdict, fusing blast radius,"
+      + " cyclomatic complexity, test coverage, exported-API surface, and downstream SQL/env dependencies."
+      + " With uncommitted=true, scores all uncommitted changes.",
+    promptSnippet: "Change risk score for a Go symbol (SAFE/REVIEW/DANGER)",
+    promptGuidelines: [
+      "Use gograph_risk to get a SAFE/REVIEW/DANGER verdict before committing a change — it fuses blast radius, complexity, coverage, API, and SQL/env in one call.",
+      "Use gograph_risk with uncommitted=true to score all uncommitted changes at once.",
+      'When the user says "how risky", "is this safe", "should I worry", or "impact" → use gograph_risk, not a sequence of other gograph tools.',
+    ],
+    parameters: RiskParams,
+    buildArgs: riskBuildArgs,
+    renderCallArgs: (a, t) =>
+      a.uncommitted ? t.fg("accent", "--uncommitted") : t.fg("accent", `"${a.symbol}"`),
+    renderExpanded: (r, t) => t.fg("dim", r.content[0]?.text?.slice(0, 3000) ?? ""),
+  });
+}
+
+/** Register `gograph_summary` — a single-call codebase briefing (session-start anchor). */
+export function registerSummaryTool(pi: ExtensionAPI): void {
+  registerSimpleTool(pi, {
+    name: "gograph_summary",
+    label: "Gograph Summary",
+    description:
+      "Single-call codebase briefing: top hotspots, worst package instability, highest cyclomatic complexity,"
+      + " orphan count, and god-object count. The session-start anchor that replaces 5 separate orientation calls.",
+    promptSnippet: "One-call codebase briefing (hotspots, coupling, complexity, orphans)",
+    promptGuidelines: [
+      "Use gograph_summary at the start of a session to orient on a Go codebase in one call — hotspots, worst instability, top complexity, orphans, god objects.",
+      'When the user says "give me an overview", "orient me", "what does this codebase look like", or "where are the hotspots" → use gograph_summary, not a sequence of other gograph tools.',
+    ],
+    parameters: SummaryParams,
+    buildArgs: summaryBuildArgs,
+    renderCallArgs: () => "",
     renderExpanded: (r, t) => t.fg("dim", r.content[0]?.text?.slice(0, 3000) ?? ""),
   });
 }

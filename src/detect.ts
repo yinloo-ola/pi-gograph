@@ -94,6 +94,28 @@ export function getGographVersion(): string | null {
     return null;
   }
 }
+/** Parse the leading `major.minor.patch` from a version string. Returns null if none. */
+function parseSemver(v: string): [number, number, number] | null {
+  const m = v.match(/(\d+)\.(\d+)\.(\d+)/);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+}
+
+/**
+ * Whether the installed gograph `actual` (e.g. "gograph version v1.4.77") is at
+ * least `minimum` (e.g. "1.4.81"). Returns false if either is null/unparseable
+ * — failing closed so a tool is never advertised against an unknown binary.
+ */
+export function versionMeets(actual: string | null, minimum: string): boolean {
+  if (!actual) return false;
+  const a = parseSemver(actual);
+  const min = parseSemver(minimum);
+  if (!a || !min) return false;
+  for (let i = 0; i < 3; i++) {
+    if (a[i] > min[i]) return true;
+    if (a[i] < min[i]) return false;
+  }
+  return true;
+}
 
 /**
  * Shared "not installed" error for consistent messaging.

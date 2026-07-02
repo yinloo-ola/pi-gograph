@@ -2,7 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { isGoRepo, hasIndex, getGographVersion, isGographInstalledSync, gographNotInstalledError } from "../src/detect.js";
+import {
+  isGoRepo,
+  hasIndex,
+  getGographVersion,
+  isGographInstalledSync,
+  gographNotInstalledError,
+  versionMeets,
+} from "../src/detect.js";
 
 describe("isGoRepo", () => {
   let tempDir: string;
@@ -98,5 +105,29 @@ describe("gographNotInstalledError", () => {
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toContain("/gograph-setup");
     expect(err.message).toContain("brew install");
+  });
+});
+describe("versionMeets", () => {
+  it("returns true when actual equals minimum", () => {
+    expect(versionMeets("gograph version v1.4.81", "1.4.81")).toBe(true);
+  });
+
+  it("returns true when actual is greater", () => {
+    expect(versionMeets("gograph version v1.4.82", "1.4.81")).toBe(true);
+    expect(versionMeets("gograph version v1.5.0", "1.4.81")).toBe(true);
+    expect(versionMeets("gograph version v2.0.0", "1.4.81")).toBe(true);
+  });
+
+  it("returns false when actual is less", () => {
+    expect(versionMeets("gograph version v1.4.77", "1.4.81")).toBe(false);
+    expect(versionMeets("gograph version v1.4.80", "1.4.81")).toBe(false);
+  });
+
+  it("returns false when actual is null", () => {
+    expect(versionMeets(null, "1.4.81")).toBe(false);
+  });
+
+  it("returns false when actual is unparseable", () => {
+    expect(versionMeets("gograph is broken", "1.4.81")).toBe(false);
   });
 });
