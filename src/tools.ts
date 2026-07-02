@@ -385,20 +385,26 @@ function registerReviewTool(pi: ExtensionAPI): void {
   });
 }
 // ── buildArgs helpers (extracted for testability) ────────────────────────────
+const SYMBOL_OR_UNCOMMITTED_ERROR = "Provide either a symbol name or set uncommitted=true.";
+
+/** Build the [cmd, <symbol|--uncommitted>] prefix. Throws SYMBOL_OR_UNCOMMITTED_ERROR if neither is set. */
+function symbolOrUncommittedArgs(
+  cmd: string,
+  p: { symbol?: string; uncommitted?: boolean },
+): string[] {
+  if (p.uncommitted) return [cmd, "--uncommitted"];
+  if (p.symbol) return [cmd, p.symbol];
+  throw new Error(SYMBOL_OR_UNCOMMITTED_ERROR);
+}
 
 /** Build `gograph context` CLI args. Throws if neither symbol nor uncommitted is set. */
 export function contextBuildArgs(p: { symbol?: string; uncommitted?: boolean }): string[] {
-  if (p.uncommitted) return ["context", "--uncommitted", "--json"];
-  if (p.symbol) return ["context", p.symbol, "--json"];
-  throw new Error("Provide either a symbol name or set uncommitted=true.");
+  return [...symbolOrUncommittedArgs("context", p), "--json"];
 }
 
 /** Build `gograph plan` CLI args. Throws if neither symbol nor uncommitted is set. */
 export function planBuildArgs(p: { symbol?: string; uncommitted?: boolean; withContext?: boolean }): string[] {
-  const args: string[] = ["plan"];
-  if (p.uncommitted) args.push("--uncommitted");
-  else if (p.symbol) args.push(p.symbol);
-  else throw new Error("Provide either a symbol name or set uncommitted=true.");
+  const args = [...symbolOrUncommittedArgs("plan", p)];
   if (p.withContext) args.push("--with-context");
   args.push("--json");
   return args;
@@ -406,12 +412,7 @@ export function planBuildArgs(p: { symbol?: string; uncommitted?: boolean; withC
 
 /** Build `gograph review` CLI args. Throws if neither symbol nor uncommitted is set. */
 export function reviewBuildArgs(p: { symbol?: string; uncommitted?: boolean }): string[] {
-  const args: string[] = ["review"];
-  if (p.uncommitted) args.push("--uncommitted");
-  else if (p.symbol) args.push(p.symbol);
-  else throw new Error("Provide either a symbol name or set uncommitted=true.");
-  args.push("--json");
-  return args;
+  return [...symbolOrUncommittedArgs("review", p), "--json"];
 }
 // ── Upstream-sync tools (risk, summary) ─────────────────────────────────────
 //
@@ -434,16 +435,7 @@ const SummaryParams = Type.Object({});
 
 /** Build `gograph risk` CLI args. Throws if neither symbol nor uncommitted is set. */
 export function riskBuildArgs(p: { symbol?: string; uncommitted?: boolean }): string[] {
-  const args: string[] = ["risk"];
-  if (p.uncommitted) {
-    args.push("--uncommitted");
-  } else if (p.symbol) {
-    args.push(p.symbol);
-  } else {
-    throw new Error("Provide either a symbol name or set uncommitted=true.");
-  }
-  args.push("--json");
-  return args;
+  return [...symbolOrUncommittedArgs("risk", p), "--json"];
 }
 
 /** Build `gograph summary` CLI args. */
