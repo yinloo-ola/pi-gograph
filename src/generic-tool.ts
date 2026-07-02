@@ -65,10 +65,7 @@ const SUBCOMMAND_DOCS: Record<string, string> = {
   dependents: "find all packages that import a given package.",
   usages: "find all places a type appears in signatures and struct fields.",
   literals: "find all struct literal initialization sites.",
-  doc: "surface Go documentation for any stdlib or third-party symbol (no graph needed).",
-  untested: "sweep for production functions with callers but zero test edges, risk-sorted.",
-  httpcalls: "statically extract all outbound net/http client calls; filter by method or URL.",
-  diagram: "generate a Mermaid architecture diagram of package dependencies.",
+doc: "surface Go documentation for any stdlib or third-party symbol (no graph needed).",
 };
 
 // ── Arg builder (exported for testing) ──────────────────────────────────────
@@ -133,7 +130,7 @@ function buildGenericDescription(subcommands: string[]): string {
     "Run gograph CLI subcommands for Go code queries not covered by primary tools.\n\n"
     + "Available subcommands (discovered from your installed gograph):\n"
     + lines.map((l) => `- ${l}`).join("\n")
-    + "\n\nUse the `flags` parameter for rare flags (--git, --since, --test-only, --no-tests, --precise).\n\n"
+    + "\n\nUse the `flags` parameter for rare flags (--git, --since, --test-only, --no-tests).\n\n"
     + "Examples:\n"
     + '- callers: gograph(subcommand="callers", target="HandleUser", depth=3)\n'
     + '- path: gograph(subcommand="path", target="HandleUser", from="DB.Save")\n'
@@ -174,7 +171,7 @@ export function registerGenericTool(pi: ExtensionAPI): void {
     ),
     flags: Type.Optional(
       Type.String({
-        description: "Rare flags: --git <ref>, --since <ref>, --test-only, --no-tests, --precise",
+        description: "Rare flags: --git <ref>, --since <ref>, --test-only, --no-tests",
       }),
     ),
   });
