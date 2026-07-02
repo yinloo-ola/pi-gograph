@@ -137,4 +137,25 @@ describe("registration", () => {
     expect(names).toContain("gograph_risk");
     expect(names).toContain("gograph_summary");
   });
+it("always registers the version-independent core tools", () => {
+    const names: string[] = [];
+    const pi = {
+      registerTool: (t: { name: string }) => {
+        names.push(t.name);
+      },
+    } as unknown as ExtensionAPI;
+    registerTools(pi);
+    for (const n of [
+      "gograph_build",
+      "gograph_query",
+      "gograph_context",
+      "gograph_implementers",
+      "gograph_endpoint",
+      "gograph_plan",
+      "gograph_explain",
+      "gograph_review",
+    ]) {
+      expect(names).toContain(n);
+    }
+  });
 });
