@@ -3,7 +3,6 @@ import { Type, TSchema } from "typebox";
 import { Text } from "@earendil-works/pi-tui";
 import { isGographInstalledSync, gographNotInstalledError } from "./detect.js";
 import { runGograph, runGographBuild, formatOutput, ensureReady } from "./runner.js";
-import { stub } from "./_ptk/stub.js";
 
 // ── Parameter schemas ────────────────────────────────────────────────────────
 
@@ -409,52 +408,78 @@ function registerReviewTool(pi: ExtensionAPI): void {
 // These wrap gograph's aggregator commands promoted to primary-tool status
 // (see docs/plans/2026-07-01-upstream-sync-decisions.md). Each is a thin
 // registerSimpleTool config: typed params + buildArgs + prompt routing. The
-// behavior comes from the gograph CLI; our code only routes args.
+// behavior comes from the gograph CLI; our code only routes args. buildArgs is
+// extracted as an exported pure function so it can be unit-tested directly.
 
-/**
- * Register `gograph_risk` — a normalized 0–100 change-risk score with a
- * SAFE / REVIEW / DANGER verdict, fusing blast radius, cyclomatic complexity,
- * test coverage, exported-API surface, and downstream SQL/env dependencies.
- *
- * Spec (execute materializes this as a registerSimpleTool config):
- *   - name: "gograph_risk", label: "Gograph Risk"
- *   - parameters: RiskParams = Type.Object({
- *       symbol: Type.Optional(Type.String("Symbol to score. Required unless uncommitted=true.")),
- *       uncommitted: Type.Optional(Type.Boolean("Score all uncommitted changes. Default false.")),
- *     })
- *   - buildArgs: ["risk"] then (--uncommitted if uncommitted, else symbol, else throw
- *     "Provide either a symbol name or set uncommitted=true."), then ["--json"]
- *   - needsReady: true, timeout: 30_000
- *   - promptSnippet: "Change risk score for a Go symbol (SAFE/REVIEW/DANGER)"
- *   - promptGuidelines:
- *       - "Use gograph_risk to get a SAFE/REVIEW/DANGER verdict before committing a change — it fuses blast radius, complexity, coverage, API, and SQL/env in one call."
- *       - "Use gograph_risk with uncommitted=true to score all uncommitted changes at once."
- *       - 'When the user says "how risky", "is this safe", "should I worry", or "impact" → use gograph_risk, not a sequence of other gograph tools.'
- *   - renderCallArgs: --uncommitted → "--uncommitted"; else "<symbol>"
- *   - renderExpanded: first 3000 chars of result text
- */
-export function registerRiskTool(pi: ExtensionAPI): void {
-  stub("tools.registerRiskTool");
+const RiskParams = Type.Object({
+  symbol: Type.Optional(
+    Type.String({ description: "Symbol to score. Required unless uncommitted=true." }),
+  ),
+  uncommitted: Type.Optional(
+    Type.Boolean({ description: "Score all uncommitted changes. Default: false." }),
+  ),
+});
+
+const SummaryParams = Type.Object({});
+
+/** Build `gograph risk` CLI args. Throws if neither symbol nor uncommitted is set. */
+export function riskBuildArgs(p: { symbol?: string; uncommitted?: boolean }): string[] {
+  const args: string[] = ["risk"];
+  if (p.uncommitted) {
+    args.push("--uncommitted");
+  } else if (p.symbol) {
+    args.push(p.symbol);
+  } else {
+    throw new Error("Provide either a symbol name or set uncommitted=true.");
+  }
+  args.push("--json");
+  return args;
 }
 
-/**
- * Register `gograph_summary` — a single-call codebase briefing aggregating the
- * top hotspots, worst package instability, highest cyclomatic complexity,
- * orphan count, and god-object count. The session-start anchor that replaces
- * 5 separate orientation calls.
- *
- * Spec (execute materializes this as a registerSimpleTool config):
- *   - name: "gograph_summary", label: "Gograph Summary"
- *   - parameters: SummaryParams = Type.Object({})  // no parameters
- *   - buildArgs: ["summary", "--json"]
- *   - needsReady: true, timeout: 30_000
- *   - promptSnippet: "One-call codebase briefing (hotspots, coupling, complexity, orphans)"
- *   - promptGuidelines:
- *       - "Use gograph_summary at the start of a session to orient on a Go codebase in one call — hotspots, worst instability, top complexity, orphans, god objects."
- *       - 'When the user says "give me an overview", "orient me", "what does this codebase look like", or "where are the hotspots" → use gograph_summary, not a sequence of other gograph tools.'
- *   - renderCallArgs: () => ""  (no args to render)
- *   - renderExpanded: first 3000 chars of result text
- */
+/** Build `gograph summary` CLI args. */
+export function summaryBuildArgs(): string[] {
+  return ["summary", "--json"];
+}
+
+/** Register `gograph_risk` — a 0–100 change-risk score with a SAFE/REVIEW/DANGER verdict. */
+export function registerRiskTool(pi: ExtensionAPI): void {
+  registerSimpleTool(pi, {
+    name: "gograph_risk",
+    label: "Gograph Risk",
+    description:
+      "Normalized 0–100 change-risk score with a SAFE / REVIEW / DANGER verdict, fusing blast radius,"
+      + " cyclomatic complexity, test coverage, exported-API surface, and downstream SQL/env dependencies."
+      + " With uncommitted=true, scores all uncommitted changes.",
+    promptSnippet: "Change risk score for a Go symbol (SAFE/REVIEW/DANGER)",
+    promptGuidelines: [
+      "Use gograph_risk to get a SAFE/REVIEW/DANGER verdict before committing a change — it fuses blast radius, complexity, coverage, API, and SQL/env in one call.",
+      "Use gograph_risk with uncommitted=true to score all uncommitted changes at once.",
+      'When the user says "how risky", "is this safe", "should I worry", or "impact" → use gograph_risk, not a sequence of other gograph tools.',
+    ],
+    parameters: RiskParams,
+    buildArgs: riskBuildArgs,
+    renderCallArgs: (a, t) =>
+      a.uncommitted ? t.fg("accent", "--uncommitted") : t.fg("accent", `"${a.symbol}"`),
+    renderExpanded: (r, t) => t.fg("dim", r.content[0]?.text?.slice(0, 3000) ?? ""),
+  });
+}
+
+/** Register `gograph_summary` — a single-call codebase briefing (session-start anchor). */
 export function registerSummaryTool(pi: ExtensionAPI): void {
-  stub("tools.registerSummaryTool");
+  registerSimpleTool(pi, {
+    name: "gograph_summary",
+    label: "Gograph Summary",
+    description:
+      "Single-call codebase briefing: top hotspots, worst package instability, highest cyclomatic complexity,"
+      + " orphan count, and god-object count. The session-start anchor that replaces 5 separate orientation calls.",
+    promptSnippet: "One-call codebase briefing (hotspots, coupling, complexity, orphans)",
+    promptGuidelines: [
+      "Use gograph_summary at the start of a session to orient on a Go codebase in one call — hotspots, worst instability, top complexity, orphans, god objects.",
+      'When the user says "give me an overview", "orient me", "what does this codebase look like", or "where are the hotspots" → use gograph_summary, not a sequence of other gograph tools.',
+    ],
+    parameters: SummaryParams,
+    buildArgs: summaryBuildArgs,
+    renderCallArgs: () => "",
+    renderExpanded: (r, t) => t.fg("dim", r.content[0]?.text?.slice(0, 3000) ?? ""),
+  });
 }
