@@ -1,4 +1,25 @@
 # Changelog
+## 0.4.0
+
+### Added
+- `gograph_summary` primary tool — session-start orientation in one call (registers when gograph ≥1.4.78)
+- `gograph_risk` primary tool — pre-commit blast radius + complexity + coverage + API + SQL in a single 0-100 verdict (registers when gograph ≥1.4.81)
+- `doc` to the generic tool's curated subcommand list (graph-free, no index needed)
+- `versionMeets` for cross-version compatibility; tools version-gated so the LLM never sees tools the installed binary can't run
+- Prompt now conditionally adapts workflow and tool list based on installed gograph version
+- `needsGraph` helper for clean graph-free subcommand gating
+- `symbolOrUncommittedArgs` shared helper to deduplicate buildArgs across context, plan, review, risk
+
+### Changed
+- System prompt: `gograph_summary` becomes the session-start anchor; `gograph_risk` joins `gograph_plan` as a pre-edit decision gate
+- Generic tool now curates 16 subcommands (was 15)
+
+### Fixed
+- `--precise` removed from the generic tool's flags hint (it is a build-time flag, not a query flag)
+- Removed dead `SUBCOMMAND_DOCS` entries for `untested`, `httpcalls`, `diagram`
+
+### Removed
+- Scaffold artifacts (`src/_ptk/stub.ts`, `src/.ptk-scaffold`) and discovery module (`src/capabilities.ts`)
 
 ## 0.3.1
 

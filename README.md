@@ -45,7 +45,7 @@ The extension activates automatically in Go projects (detected by `go.mod` or `*
 
 - `📦 gograph: run /gograph-setup` — gograph not installed
 - `gograph: run /gograph-build` — installed but no index
-- `gograph ✓ (gograph 0.3.1)` — ready (version shown when available)
+- `gograph ✓ (gograph 0.4.0)` — ready (version shown when available)
 - `gograph: rebuilding index in background...` — a branch/HEAD change was detected and a refresh is running without blocking other work
 
 ### First time setup
@@ -100,6 +100,8 @@ When you switch git branches or otherwise change the tracked HEAD, pi-gograph wi
 | `gograph_plan` | Pre-edit change plan: callers, tests, blast radius, SQL/env exposure. Supports `--uncommitted` and `--with-context`. |
 | `gograph_review` | Post-edit review: test coverage, complexity, broken interfaces. Supports `--uncommitted`. |
 | `gograph_explain` | Architectural narrative for any symbol in one call |
+| `gograph_summary` | Session-start orientation: type coverage, test quality, dead code, stale files, export surface, dependency health — in one call |
+| `gograph_risk` | Pre-commit health check: blast radius, complexity, test coverage, API changes, SQL/env exposure — a single 0-100 verdict |
 
 ### Generic tool (`gograph`)
 
@@ -121,6 +123,7 @@ For advanced queries not covered by primary tools. Uses `subcommand` parameter:
 | `stats` | Index health summary: version, timestamp, counts |
 | `dependents` | Find packages that import a given package |
 | `usages` | Find all references to a type in signatures and fields |
+| `doc` | Surface Go documentation for any stdlib or third-party symbol. No index needed. |
 | `literals` | Find all struct literal initialization sites |
 
 ## Development
