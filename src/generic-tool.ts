@@ -2,18 +2,25 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Text } from "@earendil-works/pi-tui";
 import { runGograph, formatOutput, ensureReady } from "./runner.js";
-import { getCachedCapabilities } from "./capabilities.js";
+/** Curated long-tail query subcommands exposed via the generic dispatcher.
+ *  Grown deliberately when a new gograph command earns a place — NOT auto-discovered
+ *  (see docs/plans/2026-07-01-upstream-sync-decisions.md). */
+const SUBCOMMANDS = [
+  "callers", "callees", "source", "fields", "impact", "path",
+  "returnusage", "errorflow", "changes", "check", "focus", "stats",
+  "dependents", "usages", "literals", "doc",
+];
 
 // ── Curated per-subcommand metadata ─────────────────────────────────────────
 //
-// The live list of available subcommands is DISCOVERED at session start (see
-// capabilities.ts). These maps hold the curated metadata discovery does not
-// provide: which flags a subcommand supports, whether it needs the graph, and a
-// one-line doc for the LLM. They are intentionally tolerant — a newly
-// discovered subcommand not listed here simply gets no typed flags and a
-// name-only description, and still works via the `flags` passthrough. Add a
-// subcommand to these maps only when typed flag support or a richer doc is
-// worth the curation.
+// The exposed subcommands live in the SUBCOMMANDS list above (hand-curated,
+// grown deliberately — NOT auto-discovered; see
+// docs/plans/2026-07-01-upstream-sync-decisions.md). These maps hold the
+// per-command metadata: which flags a subcommand supports, whether it needs
+// the graph, and a one-line doc for the LLM. They are intentionally tolerant
+// — a subcommand not listed here simply gets no typed flags and a name-only
+// description, and still works via the `flags` passthrough. Add a subcommand
+// to these maps only when typed flag support or a richer doc is worth it.
 
 /** Commands that accept --depth flag */
 const DEPTH_COMMANDS = new Set<string>(["callers", "callees", "path"]);
@@ -132,7 +139,7 @@ function buildGenericDescription(subcommands: string[]): string {
 // ── Tool registration ────────────────────────────────────────────────────────
 
 export function registerGenericTool(pi: ExtensionAPI): void {
-  const subcommands = getCachedCapabilities().subcommands;
+  const subcommands = SUBCOMMANDS;
 
   const GographParams = Type.Object({
     subcommand: Type.Union(

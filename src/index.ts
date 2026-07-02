@@ -5,7 +5,6 @@ import { registerTools } from "./tools.js";
 import { registerGenericTool } from "./generic-tool.js";
 import { registerCommands } from "./commands.js";
 import { getBackgroundStatus, scheduleBackgroundRefresh } from "./refresh.js";
-import { discoverCapabilities, setCachedCapabilities } from "./capabilities.js";
 
 function showStatus(
   ctx: { ui: { setStatus: (key: string, value: string | undefined) => void } },
@@ -41,10 +40,6 @@ export default function gographExtension(pi: ExtensionAPI) {
 
       const installed = await isGographInstalled();
       const indexed = installed ? await hasIndex(ctx.cwd) : false;
-
-      // Discover available subcommands once per session; the generic tool reads
-      // the cache synchronously at registration. Degrades to defaults on failure.
-      setCachedCapabilities(await discoverCapabilities());
 
       registerTools(pi);
       registerGenericTool(pi);

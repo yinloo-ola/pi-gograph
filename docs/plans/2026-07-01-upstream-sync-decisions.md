@@ -2,107 +2,117 @@
 
 ## Problem
 
-pi-gograph v0.3.1 deliberately reduced its tool surface from 23 → 9 (8 curated
-primary tools + 1 generic `gograph` dispatcher with 15 hard-coded subcommands)
-to push the LLM toward aggregation tools and avoid overwhelming it.
+Upstream gograph ships fast — **5 new analytical commands in ~2 weeks**
+(v1.4.78–1.4.87). pi-gograph deliberately reduced its tool surface from
+23 → 9 in v0.3.0 (8 curated primary tools + 1 generic dispatcher) to push the
+LLM toward aggregators, so the question is how to keep that curated surface
+in sync with upstream without re-bloating it or falling behind.
 
-Upstream gograph now ships fast: **5 new analytical commands in ~2 weeks**
-(v1.4.78–1.4.87). Hand-maintaining the `SUBCOMMANDS` literal union in
-`generic-tool.ts` for every release is perpetual churn and always lags behind
-upstream — the extension advertises a stale command set the moment a new
-gograph release lands.
+The original plan (committed in the first revision of this doc) was **auto-
+discovery** of available subcommands from `gograph capabilities`. Empirical
+investigation during implementation invalidated that assumption and reshaped
+the approach:
 
-Two of those new commands are genuine aggregators that match the extension's
-"one call replaces many" philosophy and deserve curated primary-tool status:
+1. **`gograph capabilities` is curated prose, not a machine-readable registry.**
+   `--json` is ignored; it is a human cheat-sheet. There is no structured
+   command list to parse.
+2. **`gograph --help` *is* parseable** (each command leads an indented line),
+   but it is gograph's *custom* help format (not stock cobra) and yields
+   **~50 query commands** — a 3× surface bloat over the curated 15.
+3. **gograph ships its own MCP server** (`gograph mcp`) exposing ~60 tools —
+   the canonical full-exposure path for Claude Desktop / Cursor / Antigravity.
+4. **gograph's own `coding-agent-usage.md` designates a small "PRIMARY TOKEN
+   SAVERS" tier** (`context`, `explain`, `plan`, `risk`, `summary`, `review`,
+   …) and tells agents to prefer those over chaining raw queries.
 
-- **`risk`** (v1.4.81) — normalized 0–100 change-risk score + SAFE/REVIEW/DANGER
-  verdict, fusing blast radius + complexity + coverage + API + SQL/env. The
-  natural sibling of `plan` (before) and `review` (after); decision-driving.
-- **`summary`** (v1.4.78) — single-call codebase briefing aggregating
-  hotspots + coupling + orphans + complexity + godobj. Replaces 5 calls → 1;
-  the missing session-start anchor the system prompt's "Default workflow" needs.
+Conclusion: the pi extension's reason to exist is **not** "expose gograph"
+(the MCP server already does that and would auto-inherit new commands). Its
+value is **curation into a pi-native experience** — status bar, slash commands,
+background refresh, build-locking, custom TUI rendering, and a tight system
+prompt that routes the LLM to aggregators. That curation *is* the product, and
+v0.3.0's 23→9 reduction is its differentiation. Auto-discovery that exposes all
+~50 commands contradicts both the extension's thesis and gograph's own guidance.
 
-The other new commands (`untested`, `doc`, `httpcalls`) are useful but narrower
-query/inspection commands that belong in the generic dispatcher's long tail —
-and should become available *without* a code change per release.
+So "keeping up with upstream" is answered by **deliberately promoting new
+aggregators when gograph ships them** (risk, summary now; `untested`, `doc`
+later) — a small, intentional maintenance task — not by auto-discovery.
 
 ## Approaches considered
 
-- **Option A — Selective curation (status quo).** Manually promote aggregators
-  to primary tools; hand-add the rest to the `SUBCOMMANDS` literal each release.
-  Pro: stays fully curated. Con: every release = a manual diff; the advertised
-  command set drifts behind upstream the moment a release ships.
+- **Option A — Curated surface, deliberate promotion (chosen).** Keep a
+  hand-curated primary-tool set mirroring gograph's "primary token savers"
+  tier, plus a generic dispatcher with a curated long-tail list. Promote a new
+  command to a primary tool only when it is a clear aggregator win; add niche
+  query commands to the long tail deliberately. Pro: tight, token-efficient
+  surface aligned with gograph's own hierarchy; robust (no fragile parsing);
+  preserves the extension's differentiation. Con: a small manual review on each
+  gograph release — acceptable and intentional.
 
-- **Option B — Fully dynamic passthrough.** Generic `gograph` tool discovers the
-  full command set from `gograph capabilities` and passes through arbitrary
-  subcommands + raw flags with no curation. Pro: zero maintenance. Con: loses
-  typed flag validation and the per-subcommand flag filtering; the LLM learns
-  flag usage from upstream docs instead of a typed schema.
+- **Option B — Auto-discovery via `gograph --help` (rejected).** Discover the
+  live command set by parsing `--help`, advertise it in the generic tool.
+  Rejected on three grounds: `capabilities` is prose (the documented source
+  does not exist as advertised); `--help` is a fragile custom format; and the
+  yield (~50 commands) re-bloats the surface v0.3.0 deliberately shed, while
+  gograph's own MCP server already serves anyone who wants the full firehose.
 
-- **Option C — Hybrid (curated primaries + dynamically discovered long tail).**
-  Keep the hand-tuned primary tools (best prompt routing + typed params).
-  Replace the hard-coded subcommand list with live discovery via
-  `gograph capabilities`. Manually promote a new command to a primary tool only
-  when it's a clear aggregator win.
+- **Option C — MCP proxy (rejected for now).** Bridge `gograph mcp` into pi
+  tools to auto-inherit the full suite. Best raw "keep up" answer, but
+  sacrifices curation, custom rendering, and tight prompt routing — everything
+  that justifies a pi extension over running the MCP server directly. Worth
+  revisiting only if pi grows a first-class "MCP-as-tools" bridge.
 
-**Chosen: Option C.** It answers "how do we keep up" directly — the long tail
-auto-syncs, so new query commands flow through with no code change, while the
-high-value aggregators keep their curated prompt routing. The cost is one
-discovery + cache step in the generic tool, paid once.
+**Chosen: Option A.** The curation thesis is validated by gograph's own
+"primary token savers" guidance; discovery adds fragility and surface bloat
+for no net benefit given the MCP server exists.
 
 ## Decisions
 
-### Hybrid tool surface — curated primaries + dynamically discovered long tail
+### Curated surface — no auto-discovery (reverses the earlier Option C plan)
 
-The extension will not hand-maintain the full gograph subcommand list. Primary
-tools remain hand-curated (typed params, prompt routing, aggregation-focused);
-the generic dispatcher discovers its subcommand set live from `gograph
-capabilities` at session start. New upstream query commands become available
-with zero code change; only genuine aggregators are manually promoted to
-primary tools. This was chosen over fully-dynamic (Option B) to preserve typed
-flag validation and prompt routing where they matter most, and over pure
-curation (Option A) to stop the perpetual lag behind upstream.
+The extension will NOT auto-discover subcommands. The generic dispatcher owns
+a hand-curated long-tail list; primary tools are hand-curated aggregators.
+New upstream commands are added deliberately when worth it. This reverses the
+first revision of this doc (which chose `gograph capabilities` discovery) after
+empirical investigation showed `capabilities` is prose and the curation thesis
+is the extension's core value. Chosen over discovery (Option B) for robustness
+and surface discipline, and over MCP proxy (Option C) to preserve the
+pi-native curation that justifies the extension.
 
 ### Promote `risk` and `summary` to primary tools
 
 `gograph_risk` and `gograph_summary` are added as primary tools (not
-subcommands) because they are action-deciding aggregators — `summary` replaces
-5 session-start calls, `risk` fuses 5 analyses into one verdict. This follows
-the 0.3.0 precedent of promoting one-call-replaces-many commands to primary
-status with dedicated prompt routing. Narrower new commands (`untested`,
-`doc`, `httpcalls`) stay in the discovered long tail.
+subcommands) because they are action-deciding aggregators — gograph's own
+named "primary token savers". `summary` replaces 5 session-start calls; `risk`
+fuses blast radius + complexity + coverage + API + SQL/env into one 0–100
+verdict. This follows the v0.3.0 precedent of promoting one-call-replaces-many
+commands to primary status with dedicated prompt routing.
 
-### `summary` becomes the session-start anchor in the default workflow
+### `summary` becomes the session-start anchor; `risk` the pre-commit gate
 
 The system prompt's "Default workflow" gains `summary` as the first step
-(session orientation in one call), with `risk` positioned as a decision gate
-alongside `plan` (before edit) and `review` (after edit). This is reversible
-prompt tuning, but recording it so the workflow ordering is intentional.
+(session orientation in one call, mirroring gograph's recommended session
+start), with `risk` positioned as the decision gate alongside `plan` (before
+edit) and `review` (after edit). This tracks gograph's endorsed workflow in
+`docs/coding-agent-usage.md`.
+
+### Graph-free subcommands skip the index check
+
+`doc` (a thin `go doc` wrapper) and any future graph-free command bypass the
+`ensureReady` guard so they work before the first `gograph build`. The
+generic dispatcher maintains a small `GRAPH_FREE_COMMANDS` set for this.
 
 ## Module outline
 
-- `src/capabilities.ts` *(new)* — discovery layer: query `gograph capabilities`
-  at session start, normalize the live subcommand list, cache the result for
-  the generic tool to consume. Graceful fallback to a safe default set if
-  discovery fails or `gograph capabilities` output is unparseable.
 - `src/tools.ts` *(changed)* — add `registerRiskTool` and `registerSummaryTool`
   via the existing `registerSimpleTool` helper (typed params, prompt routing).
-- `src/generic-tool.ts` *(changed)* — replace the hard-coded `SUBCOMMANDS`
-  literal union with the discovered set from `capabilities.ts`; keep the typed
-  flag-filter maps (depth/filesOnly/uncommitted) tolerant of subcommands that
-  aren't present; tolerate graph-free subcommands (e.g. `doc`).
-- `src/index.ts` *(changed)* — run discovery before registering the generic
-  tool; add `risk` + `summary` to the system prompt tool list and default
-  workflow (`summary` = session start, `risk` = decision gate).
-- `src/runner.ts` *(possibly changed)* — expose a capability-query path (or
-  reuse the existing `runGograph`), decided at scaffold.
+- `src/generic-tool.ts` *(changed)* — owns the curated long-tail `SUBCOMMANDS`
+  list (no external discovery); keeps the curated flag-filter maps and the
+  `SUBCOMMAND_DOCS` map (rich docs for known commands, name-only fallback);
+  adds `GRAPH_FREE_COMMANDS` so `doc` skips `ensureReady`.
+- `src/index.ts` *(changed)* — add `risk` + `summary` to the system prompt tool
+  list and default workflow (`summary` = session start, `risk` = decision gate).
+  No discovery wiring.
 
-### Open consideration for scaffold
-
-`doc` (and any future graph-free subcommand) does not need an AST index. The
-generic tool currently always calls `ensureReady`. Discovery must not force a
-graph build for subcommands that don't need one — scaffold to decide the
-mechanism (a small graph-free exclusion set sourced from the same
-`capabilities` data, vs. a lenient `ensureReady`). Flagging because it
-interacts with the discovery work; resolving it is scaffold's call, not a
-hard-to-reverse decision worth an ADR here.
+No `capabilities.ts` / discovery module — dropped after the empirical finding.
+The long tail grows by deliberate edits to `SUBCOMMANDS` when a new command
+earns a place, not by runtime discovery.
