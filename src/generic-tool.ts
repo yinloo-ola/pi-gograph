@@ -42,6 +42,11 @@ const NO_TARGET_COMMANDS = new Set<string>(["stats", "changes", "check"]);
  * These skip the ensureReady guard so they work even before the first build.
  */
 const GRAPH_FREE_COMMANDS = new Set<string>(["doc"]);
+/** Whether a subcommand needs a built AST index. Graph-free commands (e.g. `doc`)
+ *  return false and skip the ensureReady guard. Exported for direct unit testing. */
+export function needsGraph(subcommand: string): boolean {
+  return !GRAPH_FREE_COMMANDS.has(subcommand);
+}
 
 /** Curated one-line docs for known subcommands. Unknown ones get name-only. */
 const SUBCOMMAND_DOCS: Record<string, string> = {
@@ -187,8 +192,7 @@ export function registerGenericTool(pi: ExtensionAPI): void {
     ],
     parameters: GographParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      // Graph-free subcommands (e.g. doc) skip the index check.
-      if (!GRAPH_FREE_COMMANDS.has(params.subcommand)) {
+if (needsGraph(params.subcommand)) {
         await ensureReady(pi, ctx);
       }
       const args = buildGenericArgs(params as unknown as GenericInput);
